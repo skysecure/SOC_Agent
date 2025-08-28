@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import './App.css';
 
@@ -187,10 +188,10 @@ function App() {
     setLoading(true);
     setError('');
     setReport(null);
-
+    http://10.217.108.8/
     try {
       const parsedData = JSON.parse(incidentData);
-      const response = await axios.post('http://10.99.8.8:3002/analyse', parsedData);
+      const response = await axios.post('http://10.217.108.8:3002/analyse', parsedData);
       setReport(response.data);
     } catch (err) {
       if (err.message.includes('JSON')) {
@@ -210,8 +211,11 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>SOC Incident Analyzer</h1>
-        <p>Security Operations Center - Automated Incident Analysis</p>
+        <div>
+          <h1>SOC Incident Analyzer</h1>
+          <p>Security Operations Center - Automated Incident Analysis</p>
+        </div>
+        <Link to="/dashboard" className="dashboard-link">View Dashboard →</Link>
       </header>
 
       <main className="app-main">
