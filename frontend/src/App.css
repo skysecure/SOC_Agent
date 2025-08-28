@@ -1,0 +1,205 @@
+.app {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+.app-header {
+  background: #1a237e;
+  color: white;
+  padding: 2rem;
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.app-header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.app-main {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 2rem;
+}
+
+.input-section {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+}
+
+.input-section h2 {
+  color: #1a237e;
+  margin-bottom: 1rem;
+}
+
+.input-section textarea {
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 4px;
+  font-family: monospace;
+  resize: vertical;
+  transition: border-color 0.3s;
+}
+
+.input-section textarea:focus {
+  outline: none;
+  border-color: #3f51b5;
+}
+
+.input-section button {
+  background: #3f51b5;
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 1rem;
+  transition: all 0.3s;
+}
+
+.input-section button:hover:not(:disabled) {
+  background: #303f9f;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.input-section button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #d32f2f;
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #ffebee;
+  border-radius: 4px;
+}
+
+.report-section {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  animation: slideIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.report-section h2 {
+  color: #1a237e;
+  margin-bottom: 2rem;
+  text-align: center;
+  font-size: 2rem;
+}
+
+.report-block {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border-left: 4px solid #3f51b5;
+}
+
+.report-block h3 {
+  color: #1a237e;
+  margin-bottom: 1rem;
+}
+
+.report-block pre {
+  background: #e8eaf6;
+  padding: 1rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.severity-badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-weight: bold;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+}
+
+.severity-critical {
+  background: #d32f2f;
+  color: white;
+}
+
+.severity-high {
+  background: #f57c00;
+  color: white;
+}
+
+.severity-medium {
+  background: #fbc02d;
+  color: #333;
+}
+
+.severity-low {
+  background: #388e3c;
+  color: white;
+}
+
+.analysis-content {
+  background: #e8eaf6;
+  padding: 1rem;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  font-family: monospace;
+  font-size: 0.9rem;
+}
+
+.actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.actions-grid h4 {
+  color: #3f51b5;
+  margin-bottom: 0.5rem;
+}
+
+.actions-grid ul {
+  list-style: none;
+  padding: 0;
+}
+
+.actions-grid li {
+  padding: 0.5rem 0;
+  padding-left: 1.5rem;
+  position: relative;
+}
+
+.actions-grid li:before {
+  content: '▶';
+  position: absolute;
+  left: 0;
+  color: #3f51b5;
+}
+
+@media (max-width: 768px) {
+  .app-main {
+    padding: 0 1rem;
+  }
+  
+  .actions-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .app-header h1 {
+    font-size: 2rem;
+  }
+}

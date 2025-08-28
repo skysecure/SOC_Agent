@@ -1,0 +1,20 @@
+{
+  "timestamp": "2024-01-15T14:23:00Z",
+  "type": "Unauthorized Access Attempt",
+  "source_ip": "192.168.1.100",
+  "target_system": "Database Server DB-PROD-01",
+  "affected_systems": ["DB-PROD-01", "APP-SERVER-03"],
+  "alert_details": {
+    "alert_id": "SEC-2024-0115-001",
+    "detection_method": "IDS Alert",
+    "alert_severity": "High"
+  },
+  "attack_details": {
+    "attack_vector": "SQL Injection",
+    "payload": "1' OR '1'='1",
+    "attempts": 47,
+    "successful_attempts": 0
+  },
+  "user_account": "webapp_service",
+  "description": "Multiple SQL injection attempts detected targeting production database. All attempts were blocked by WAF, but pattern suggests automated attack tool usage."
+}
