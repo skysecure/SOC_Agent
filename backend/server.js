@@ -193,6 +193,98 @@ app.patch('/incidents/:id', async (req, res) => {
   }
 });
 
+// AI Chat endpoint
+app.post('/ai/chat', async (req, res) => {
+  try {
+    const { query, currentIncident, allIncidents, conversationHistory } = req.body;
+    
+    // Create a context-aware prompt for Gemini
+    const incidentContext = currentIncident ? `
+Current Incident Being Analyzed:
+- ID: ${currentIncident.id}
+- Type: ${currentIncident.type}
+- Severity: ${currentIncident.severityAssessment?.aiAssessedSeverity || currentIncident.severity}
+- Status: ${currentIncident.status}
+- Executive Summary: ${currentIncident.executiveSummary}
+- Root Cause: ${currentIncident.rootCauseAnalysis?.primaryCause || 'Under investigation'}
+- Affected Users: ${currentIncident.affectedUsers?.join(', ') || 'None'}
+
+Full Incident Report Available: ${currentIncident.report ? 'Yes' : 'No'}
+` : 'No specific incident selected.';
+
+    const dbContext = `
+Total Incidents in Database: ${allIncidents.length}
+Incident Types: ${[...new Set(allIncidents.map(i => i.type))].join(', ')}
+Severity Distribution: 
+- High: ${allIncidents.filter(i => (i.severityAssessment?.aiAssessedSeverity || i.severity) === 'high').length}
+- Medium: ${allIncidents.filter(i => (i.severityAssessment?.aiAssessedSeverity || i.severity) === 'medium').length}
+- Low: ${allIncidents.filter(i => (i.severityAssessment?.aiAssessedSeverity || i.severity) === 'low').length}
+`;
+
+    const conversationContext = conversationHistory.slice(-5).map(msg => 
+      `${msg.type === 'user' ? 'User' : 'Assistant'}: ${msg.text}`
+    ).join('\n');
+
+    const prompt = `You are an AI Security Assistant helping analyze security incidents. Use the provided incident data to give accurate, specific responses.
+
+${incidentContext}
+
+${dbContext}
+
+Recent Conversation:
+${conversationContext}
+
+User Query: ${query}
+
+Instructions:
+1. Provide specific answers based on the actual incident data
+2. Reference real values from the incident (IDs, severity levels, etc.)
+3. If information is not available, say so clearly
+4. Keep responses concise but informative
+5. For recommendations, base them on the actual incident type and severity
+6. Use security best practices in your advice
+
+Response:`;
+
+    const response = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-goog-api-key': process.env.GEMINI_API_KEY
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 500
+          }
+        })
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const aiResponse = data.candidates[0].content.parts[0].text;
+
+    res.json({ response: aiResponse });
+  } catch (error) {
+    console.error('AI Chat error:', error);
+    res.status(500).json({ 
+      error: 'Failed to get AI response',
+      response: 'I apologize, but I encountered an error processing your request. Please try again or check the incident details directly.'
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

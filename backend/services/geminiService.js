@@ -9,7 +9,6 @@ function normalizeSeverity(severity) {
   }
   const normalized = severity.toLowerCase().trim();
   const severityMap = {
-    'critical': 'high',
     'high': 'high',
     'medium': 'medium',
     'low': 'low',
