@@ -3,7 +3,10 @@ import { Agent1_instructions } from './agentInstructions.js';
 
 // Normalize severity levels to allowed values
 function normalizeSeverity(severity) {
-  if (!severity) return 'medium';
+  if (!severity) {
+    console.log('WARNING: Severity normalization fallback - no severity provided');
+    return null; // Don't assume medium
+  }
   const normalized = severity.toLowerCase().trim();
   const severityMap = {
     'critical': 'high',
@@ -14,7 +17,13 @@ function normalizeSeverity(severity) {
     'info': 'informational',
     'informational': 'informational'
   };
-  return severityMap[normalized] || 'medium';
+  
+  if (!severityMap[normalized]) {
+    console.log(`WARNING: Severity normalization fallback - unknown severity "${severity}"`);
+    return null; // Don't assume medium
+  }
+  
+  return severityMap[normalized];
 }
 
 export async function analyzeIncident(incidentData) {
@@ -31,15 +40,15 @@ export async function analyzeIncident(incidentData) {
     4. Generate the response as a structured JSON object
     
     The JSON response must include these keys:
-    - incidentOverview (including id, timestamp, typeOfIncident, users, validatedSeverity, severityJustification, executiveSummary, initialIndicators, attackProgression)
-    - timelineOfEvents (array of events with timestamps and descriptions)
+    - incidentOverview (including id, owner, openedUTC, status, detectionSource, analyticsRuleName, environment, affectedService, timestamp, typeOfIncident, users, initialSeverity, aiAssessedSeverity, severityAssessment, executiveSummary, initialIndicators, attackProgression)
+    - timelineOfEvents (structured array with timestamp, source, eventAction, notes, confidence)
     - detectionDetails (primaryDetection, secondaryDetections, sourceAnalysis, effectiveness, correlation)
     - attackVectorAndTechniques (accessVector, mitreMapping, tools, sophistication, evasion)
     - rootCauseAnalysis (primaryCause, contributingFactors, controlFailures, vulnerabilityTimeline, previousIncidents, riskAcceptance)
     - scopeAndImpact (systems, users, data, business, compliance, duration)
     - containmentAndRemediation (immediate, shortTerm, eradication, recovery, validation)
-    - recommendations (immediateActions, shortTermImprovements, longTermStrategic, lessonsLearned)
-    - evidenceAndArtifacts (primaryEvidence, iocs, behavioralIndicators, forensicArtifacts, queries)
+    - recommendationsActionsFollowUp (verdict, verdictRationale, actionsTaken, immediateActions, shortTermImprovements, longTermStrategic, followUpTasks, lessonsLearned)
+    - evidenceAndArtifacts (primaryEvidence, logFieldInterpretation, iocs, behavioralIndicators, forensicArtifacts, entityAppendices, queries)
     - additionalDataRequirements (critical, high, medium priority needs)
     
     CRITICAL: The incidentOverview MUST include a specific "typeOfIncident" field with a clear, industry-standard incident classification.`;
@@ -62,6 +71,8 @@ export async function analyzeIncident(incidentData) {
     );
 
     const text = response.data.candidates[0].content.parts[0].text;
+    console.log('Raw Gemini response length:', text.length);
+    console.log('Raw Gemini response preview:', text.substring(0, 200) + '...');
     
     try {
       // Extract JSON from markdown code blocks or raw JSON
@@ -70,18 +81,31 @@ export async function analyzeIncident(incidentData) {
       // First try to extract from markdown code blocks
       const codeBlockMatch = text.match(/```json\s*([\s\S]*?)```/);
       if (codeBlockMatch) {
+        console.log('Found JSON in code block');
         jsonString = codeBlockMatch[1].trim();
       } else {
+        console.log('No code block found, looking for raw JSON');
         // Try to extract raw JSON
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
+          console.log('Found raw JSON');
           jsonString = jsonMatch[0];
+        } else {
+          console.log('ERROR: No JSON found in response');
+          console.log('Full response:', text);
+          throw new Error('No JSON found in Gemini response');
         }
       }
       
+      console.log('Attempting to parse JSON string length:', jsonString.length);
       // Parse the JSON
       const parsedResponse = JSON.parse(jsonString);
       console.log('Successfully parsed RCA response');
+      console.log('Parsed severity values:', {
+        initial: parsedResponse.incidentOverview?.initialSeverity,
+        aiAssessed: parsedResponse.incidentOverview?.aiAssessedSeverity,
+        validatedSeverity: parsedResponse.incidentOverview?.validatedSeverity
+      });
         
         // Transform the response to match the expected frontend structure
         const transformedResponse = {
@@ -90,9 +114,31 @@ export async function analyzeIncident(incidentData) {
                           "Analysis completed",
           
           incidentDetails: {
-            id: parsedResponse.incidentOverview?.id || 
+            id: parsedResponse.incidentOverview?.incidentId || 
+                parsedResponse.incidentOverview?.id || 
                 incidentData.id || 
                 incidentData.properties?.id,
+            owner: parsedResponse.incidentOverview?.owner || 
+                   parsedResponse.incidentOverview?.analyst || 
+                   incidentData.properties?.owner?.userPrincipalName || 
+                   "Unassigned",
+            openedUTC: parsedResponse.incidentOverview?.openedUTC || 
+                       parsedResponse.incidentOverview?.createdTimeUtc || 
+                       incidentData.properties?.createdTimeUtc || 
+                       incidentData.createdTimeUtc,
+            status: parsedResponse.incidentOverview?.status || 
+                    incidentData.properties?.status || 
+                    "Active",
+            detectionSource: parsedResponse.incidentOverview?.detectionSource || 
+                            "Unknown",
+            analyticsRuleName: parsedResponse.incidentOverview?.analyticsRuleName || 
+                              incidentData.properties?.alertDisplayName || 
+                              "N/A",
+            environment: parsedResponse.incidentOverview?.environment || 
+                        parsedResponse.incidentOverview?.tenant || 
+                        "Production",
+            affectedService: parsedResponse.incidentOverview?.affectedService || 
+                            "Unknown",
             timestamp: parsedResponse.incidentOverview?.createdTimeUtc || 
                       incidentData.properties?.createdTimeUtc || 
                       incidentData.createdTimeUtc,
@@ -102,19 +148,25 @@ export async function analyzeIncident(incidentData) {
             typeOfIncident: parsedResponse.incidentOverview?.typeOfIncident || 
                            parsedResponse.incidentOverview?.title || 
                            "Security Incident",
-            affectedUsers: parsedResponse.incidentOverview?.['affectedUPN/Users'] || 
+            affectedUsers: parsedResponse.incidentOverview?.affectedUPN || 
                           parsedResponse.incidentOverview?.affectedUsers || []
           },
           
           severityAssessment: {
-            level: normalizeSeverity(
-              parsedResponse.incidentOverview?.['VALIDATED Severity Level'] || 
+            initialSeverity: normalizeSeverity(
+              parsedResponse.incidentOverview?.initialSeverity || 
+              incidentData.properties?.severity
+            ) || 'informational', // Use informational instead of medium as fallback
+            aiAssessedSeverity: normalizeSeverity(
+              parsedResponse.incidentOverview?.aiAssessedSeverity || 
               parsedResponse.incidentOverview?.validatedSeverity || 
-              parsedResponse.severityAssessment?.level || 
-              incidentData.properties?.severity ||
-              'medium'
-            ),
-            justification: parsedResponse.incidentOverview?.severityJustification || 
+              parsedResponse.severityAssessment?.level
+            ) || 'informational', // Default to informational if parsing fails
+            severityParsingNote: !parsedResponse.incidentOverview?.aiAssessedSeverity ? 'AI severity not found in response - defaulted to informational' : null,
+            severityMatch: parsedResponse.incidentOverview?.severityAssessment?.includes('Match') || 
+                          (parsedResponse.incidentOverview?.initialSeverity === parsedResponse.incidentOverview?.aiAssessedSeverity),
+            justification: parsedResponse.incidentOverview?.severityAssessment || 
+                          parsedResponse.incidentOverview?.severityJustification || 
                           parsedResponse.severityAssessment?.justification || 
                           "Automated assessment based on incident analysis"
           },
@@ -138,20 +190,37 @@ export async function analyzeIncident(incidentData) {
           },
           
           recommendedActions: {
-            immediate: parsedResponse.recommendations?.immediateActions || 
+            immediate: parsedResponse.recommendationsActionsFollowUp?.immediateActions || 
+                      parsedResponse.recommendations?.immediateActions || 
                       parsedResponse.containmentAndRemediation?.immediateContainment || [],
-            longTerm: parsedResponse.recommendations?.longTermStrategic || 
-                     parsedResponse.recommendations?.['long-TermStrategic'] || []
+            shortTerm: parsedResponse.recommendationsActionsFollowUp?.shortTermImprovements || 
+                      parsedResponse.recommendations?.shortTermImprovements || [],
+            longTerm: parsedResponse.recommendationsActionsFollowUp?.longTermStrategic || 
+                     parsedResponse.recommendations?.longTermStrategic || []
           },
           
-          preventionMeasures: parsedResponse.recommendations?.lessonsLearned || [],
+          verdict: parsedResponse.recommendationsActionsFollowUp?.verdict || "Under Investigation",
+          verdictRationale: parsedResponse.recommendationsActionsFollowUp?.verdictRationale || "",
+          actionsTaken: parsedResponse.recommendationsActionsFollowUp?.actionsTaken || {},
+          followUpTasks: parsedResponse.recommendationsActionsFollowUp?.followUpTasks || [],
+          
+          preventionMeasures: parsedResponse.recommendationsActionsFollowUp?.lessonsLearned || 
+                             parsedResponse.recommendations?.lessonsLearned || [],
           
           // Store all parsed sections
           timelineOfEvents: parsedResponse.timelineOfEvents || [],
           detectionDetails: parsedResponse.detectionDetails || {},
           attackVectorAndTechniques: parsedResponse.attackVectorAndTechniques || {},
           containmentAndRemediation: parsedResponse.containmentAndRemediation || {},
-          evidenceAndArtifacts: parsedResponse.evidenceAndArtifacts || {},
+          evidenceAndArtifacts: {
+            ...parsedResponse.evidenceAndArtifacts,
+            logFieldInterpretation: parsedResponse.evidenceAndArtifacts?.logFieldInterpretation || [],
+            entityAppendices: parsedResponse.evidenceAndArtifacts?.entityAppendices || {
+              ipAddresses: [],
+              urls: [],
+              domains: []
+            }
+          },
           additionalDataRequirements: parsedResponse.additionalDataRequirements || {},
           
           // Additional detailed RCA data
@@ -161,26 +230,18 @@ export async function analyzeIncident(incidentData) {
         console.log('Transformed response with incident type:', transformedResponse.incidentDetails.typeOfIncident);
         return transformedResponse;
     } catch (parseError) {
-      console.error('JSON parsing error:', parseError);
-      console.error('Raw text received:', text.substring(0, 500) + '...');
+      console.error('JSON PARSING FAILED - This is likely why you\'re getting medium severity!');
+      console.error('Parse error details:', parseError.message);
+      console.error('Raw Gemini response (first 1000 chars):', text.substring(0, 1000));
+      console.error('Raw Gemini response (last 500 chars):', text.substring(Math.max(0, text.length - 500)));
+      
+      // Don't return a fallback - throw error to surface the issue
+      throw new Error(`JSON parsing failed: ${parseError.message}. Raw response length: ${text.length}`);
     }
     
-    // Fallback response if parsing fails
-    return {
-      executiveSummary: "Analysis completed with errors",
-      incidentDetails: incidentData,
-      severityAssessment: { 
-        level: "medium", 
-        justification: "Unable to perform detailed analysis - using default assessment" 
-      },
-      rootCauseAnalysis: { 
-        analysis: text,
-        error: "Failed to parse detailed RCA response"
-      },
-      impactAssessment: "To be determined",
-      recommendedActions: { immediate: [], longTerm: [] },
-      preventionMeasures: []
-    };
+    // This fallback should never be reached now
+    console.error('CRITICAL: Reached unexpected fallback in geminiService');
+    throw new Error('Unexpected code path - investigation needed');
   } catch (error) {
     console.error('Gemini API error:', error);
     throw new Error('Failed to analyze incident with Gemini');

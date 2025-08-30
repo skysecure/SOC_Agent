@@ -119,7 +119,7 @@ app.post('/analyse', async (req, res) => {
       timestamp: new Date(),
       originalData: incidentData,
       report: report,
-      severity: report.severityAssessment?.level || 'UNKNOWN',
+      severity: report.severityAssessment?.aiAssessedSeverity || report.severityAssessment?.initialSeverity || 'UNKNOWN',
       status: 'new',
       type: extractIncidentType(report),
       executiveSummary: report.executiveSummary,
@@ -138,8 +138,9 @@ app.post('/analyse', async (req, res) => {
 
 // Get all incidents
 app.get('/incidents', async (req, res) => {
+
   try {
-    // Return simplified incident data for dashboard
+    // Return simplified incident data for dashboard including severity assessment
     const simplifiedIncidents = incidents.map(inc => ({
       id: inc.id,
       timestamp: inc.timestamp,
@@ -148,9 +149,10 @@ app.get('/incidents', async (req, res) => {
       type: inc.type,
       executiveSummary: inc.executiveSummary,
       affectedUsers: inc.affectedUsers,
-      responseTime: inc.responseTime
+      responseTime: inc.responseTime,
+      // Include severity assessment data for the dashboard
+      severityAssessment: inc.report?.severityAssessment || null
     }));
-    
     res.json(simplifiedIncidents);
   } catch (error) {
     console.error('Error fetching incidents:', error);

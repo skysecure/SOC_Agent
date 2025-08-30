@@ -101,10 +101,19 @@ function ReportDisplay({ report }) {
     'executiveSummary',
     'severityAssessment',
     'incidentDetails',
+    'timelineOfEvents',
+    'detectionDetails',
+    'attackVectorAndTechniques',
     'rootCauseAnalysis',
     'impactAssessment',
+    'containmentAndRemediation',
+    'verdict',
+    'actionsTaken',
     'recommendedActions',
+    'followUpTasks',
     'preventionMeasures',
+    'evidenceAndArtifacts',
+    'additionalDataRequirements',
     'fullRCAReport'
   ];
 
@@ -143,15 +152,195 @@ function ReportDisplay({ report }) {
         }
 
         if (key === 'severityAssessment' && typeof value === 'object') {
+          const severityMatch = value.severityMatch;
           return (
             <div key={key} className="report-block">
               <h3>{title}</h3>
-              {value.level && (
-                <div className={`severity-badge ${getSeverityClass(value.level)}`}>
-                  {value.level}
+              <div className="severity-comparison">
+                <div className="severity-item">
+                  <span className="severity-label">Initial Severity:</span>
+                  <div className={`severity-badge ${getSeverityClass(value.initialSeverity)}`}>
+                    {value.initialSeverity}
+                  </div>
+                </div>
+                <div className="severity-arrow">→</div>
+                <div className="severity-item">
+                  <span className="severity-label">AI-Assessed Severity:</span>
+                  <div className={`severity-badge ${getSeverityClass(value.aiAssessedSeverity)}`}>
+                    {value.aiAssessedSeverity}
+                  </div>
+                </div>
+                {!severityMatch && (
+                  <div className="severity-change-indicator">⚠️ Changed</div>
+                )}
+              </div>
+              {value.justification && (
+                <div className="severity-justification">
+                  <strong>Assessment Rationale:</strong> {value.justification}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        if (key === 'verdict' && typeof value === 'string') {
+          const verdictClass = value.toLowerCase().includes('false') ? 'verdict-false-positive' : 
+                              value.toLowerCase().includes('true') ? 'verdict-true-positive' : 
+                              'verdict-inconclusive';
+          return (
+            <div key={key} className="report-block">
+              <h3>Verdict</h3>
+              <div className={`verdict-badge ${verdictClass}`}>
+                {value}
+              </div>
+              {report.verdictRationale && (
+                <div className="verdict-rationale">
+                  <strong>Rationale:</strong> {report.verdictRationale}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        if (key === 'timelineOfEvents' && Array.isArray(value)) {
+          return (
+            <div key={key} className="report-block">
+              <h3>{title}</h3>
+              <div className="timeline-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Timestamp (UTC)</th>
+                      <th>Source</th>
+                      <th>Event/Action</th>
+                      <th>Notes</th>
+                      <th>Confidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {value.map((event, idx) => (
+                      <tr key={idx}>
+                        <td>{event.timestamp || event.time || '-'}</td>
+                        <td>{event.source || '-'}</td>
+                        <td>{event.eventAction || event.event || event.description || '-'}</td>
+                        <td>{event.notes || '-'}</td>
+                        <td>
+                          <span className={`confidence-${(event.confidence || 'unknown').toLowerCase()}`}>
+                            {event.confidence || '-'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        }
+
+        if (key === 'evidenceAndArtifacts' && typeof value === 'object') {
+          return (
+            <div key={key} className="report-block">
+              <h3>{title}</h3>
+              {value.logFieldInterpretation && Array.isArray(value.logFieldInterpretation) && (
+                <div className="subsection">
+                  <h4>Log Field Interpretation</h4>
+                  <table className="log-interpretation-table">
+                    <thead>
+                      <tr>
+                        <th>Field Name</th>
+                        <th>Value</th>
+                        <th>Interpretation</th>
+                        <th>Significance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {value.logFieldInterpretation.map((field, idx) => (
+                        <tr key={idx}>
+                          <td>{field.fieldName || '-'}</td>
+                          <td>{field.value || '-'}</td>
+                          <td>{field.interpretation || '-'}</td>
+                          <td>{field.significance || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {value.entityAppendices && (
+                <div className="entity-appendices">
+                  {value.entityAppendices.ipAddresses && value.entityAppendices.ipAddresses.length > 0 && (
+                    <div className="subsection">
+                      <h4>IP Address Analysis</h4>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>IP Address</th>
+                            <th>Geolocation</th>
+                            <th>Reputation</th>
+                            <th>First Seen</th>
+                            <th>Last Seen</th>
+                            <th>Activity</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {value.entityAppendices.ipAddresses.map((ip, idx) => (
+                            <tr key={idx}>
+                              <td>{ip.address || '-'}</td>
+                              <td>{ip.geolocation || '-'}</td>
+                              <td className={`reputation-${(ip.reputation || 'unknown').toLowerCase()}`}>
+                                {ip.reputation || '-'}
+                              </td>
+                              <td>{ip.firstSeen || '-'}</td>
+                              <td>{ip.lastSeen || '-'}</td>
+                              <td>{ip.activity || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
               <JsonRenderer data={value} />
+            </div>
+          );
+        }
+
+        if (key === 'followUpTasks' && Array.isArray(value)) {
+          return (
+            <div key={key} className="report-block">
+              <h3>Follow-Up Tasks</h3>
+              <table className="followup-table">
+                <thead>
+                  <tr>
+                    <th>Task</th>
+                    <th>Owner</th>
+                    <th>Due Date</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {value.map((task, idx) => (
+                    <tr key={idx}>
+                      <td>{task.task || task.description || '-'}</td>
+                      <td>{task.owner || '-'}</td>
+                      <td>{task.dueDate || '-'}</td>
+                      <td>
+                        <span className={`priority-${(task.priority || 'medium').toLowerCase()}`}>
+                          {task.priority || '-'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`status-${(task.status || 'pending').toLowerCase().replace(' ', '-')}`}>
+                          {task.status || '-'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           );
         }
@@ -206,9 +395,44 @@ function Dashboard() {
     }
   };
 
-  // Calculate metrics
+  // Calculate metrics including both initial and AI-assessed severities
   const metrics = {
     total: incidents.length,
+    // Count initial severities
+    initialHigh: incidents.filter(i => {
+      const initial = i.severityAssessment?.initialSeverity || i.severity;
+      return initial?.toLowerCase() === 'high';
+    }).length,
+    initialMedium: incidents.filter(i => {
+      const initial = i.severityAssessment?.initialSeverity || i.severity;
+      return initial?.toLowerCase() === 'medium';
+    }).length,
+    initialLow: incidents.filter(i => {
+      const initial = i.severityAssessment?.initialSeverity || i.severity;
+      return initial?.toLowerCase() === 'low';
+    }).length,
+    initialInformational: incidents.filter(i => {
+      const initial = i.severityAssessment?.initialSeverity || i.severity;
+      return initial?.toLowerCase() === 'informational';
+    }).length,
+    // Count AI-assessed severities
+    aiHigh: incidents.filter(i => {
+      const ai = i.severityAssessment?.aiAssessedSeverity || i.severity;
+      return ai?.toLowerCase() === 'high';
+    }).length,
+    aiMedium: incidents.filter(i => {
+      const ai = i.severityAssessment?.aiAssessedSeverity || i.severity;
+      return ai?.toLowerCase() === 'medium';
+    }).length,
+    aiLow: incidents.filter(i => {
+      const ai = i.severityAssessment?.aiAssessedSeverity || i.severity;
+      return ai?.toLowerCase() === 'low';
+    }).length,
+    aiInformational: incidents.filter(i => {
+      const ai = i.severityAssessment?.aiAssessedSeverity || i.severity;
+      return ai?.toLowerCase() === 'informational';
+    }).length,
+    // Legacy counts for backward compatibility
     high: incidents.filter(i => i.severity?.toLowerCase() === 'high').length,
     medium: incidents.filter(i => i.severity?.toLowerCase() === 'medium').length,
     low: incidents.filter(i => i.severity?.toLowerCase() === 'low').length,
@@ -221,12 +445,12 @@ function Dashboard() {
       : 0
   };
 
-  // Prepare data for charts
+  // Prepare data for charts - showing both initial and AI-assessed severities
   const severityData = [
-    { name: 'High', value: metrics.high, color: '#d32f2f' },
-    { name: 'Medium', value: metrics.medium, color: '#f57c00' },
-    { name: 'Low', value: metrics.low, color: '#fbc02d' },
-    { name: 'Informational', value: metrics.informational, color: '#388e3c' }
+    { name: 'High', initial: metrics.initialHigh, ai: metrics.aiHigh, color: '#d32f2f' },
+    { name: 'Medium', initial: metrics.initialMedium, ai: metrics.aiMedium, color: '#f57c00' },
+    { name: 'Low', initial: metrics.initialLow, ai: metrics.aiLow, color: '#fbc02d' },
+    { name: 'Informational', initial: metrics.initialInformational, ai: metrics.aiInformational, color: '#388e3c' }
   ];
 
   const statusData = [
@@ -253,6 +477,7 @@ function Dashboard() {
     if (level === 'medium') return 'severity-medium';
     if (level === 'low') return 'severity-low';
     if (level === 'informational') return 'severity-informational';
+    if (level === 'unknown') return 'severity-unknown';
     return 'severity-medium'; // default
   };
 
@@ -319,24 +544,28 @@ function Dashboard() {
           <div className="chart-container">
             <h3>Severity Distribution</h3>
             <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={severityData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {severityData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
+              <BarChart data={severityData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip 
+                  formatter={(value, name) => [
+                    value,
+                    name === 'initial' ? 'Initial Severity' : 'AI-Assessed Severity'
+                  ]}
+                />
+                <Legend 
+                  formatter={(value) => value === 'initial' ? 'Initial Severity' : 'AI-Assessed Severity'}
+                />
+                <Bar dataKey="initial" fill="#9e9e9e" name="initial" />
+                <Bar dataKey="ai" fill="#3f51b5" name="ai" />
+              </BarChart>
             </ResponsiveContainer>
+            <div className="severity-legend">
+              <p style={{fontSize: '12px', color: '#666', marginTop: '8px', textAlign: 'center'}}>
+                Gray bars show initial severity, Blue bars show AI-assessed severity
+              </p>
+            </div>
           </div>
 
           <div className="chart-container">
@@ -379,9 +608,16 @@ function Dashboard() {
                     <td>{format(new Date(incident.timestamp), 'MMM dd, HH:mm')}</td>
                     <td>{incident.type}</td>
                     <td>
-                      <span className={`severity-badge ${getSeverityClass(incident.severity)}`}>
-                        {incident.severity}
-                      </span>
+                      <div style={{display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start'}}>
+                        <span className={`severity-badge ${getSeverityClass(incident.severityAssessment?.initialSeverity || incident.severity)}`}>
+                          Initial: {incident.severityAssessment?.initialSeverity || incident.severity || 'UNKNOWN'}
+                        </span>
+                        {incident.severityAssessment?.aiAssessedSeverity && (
+                          <span className={`severity-badge ${getSeverityClass(incident.severityAssessment.aiAssessedSeverity)}`}>
+                            AI: {incident.severityAssessment.aiAssessedSeverity}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td>
                       <span className={`status-badge ${getStatusClass(incident.status)}`}>

@@ -96,10 +96,19 @@ function ReportDisplay({ report }) {
     'executiveSummary',
     'severityAssessment',
     'incidentDetails',
+    'timelineOfEvents',
+    'detectionDetails',
+    'attackVectorAndTechniques',
     'rootCauseAnalysis',
     'impactAssessment',
+    'containmentAndRemediation',
+    'verdict',
+    'actionsTaken',
     'recommendedActions',
+    'followUpTasks',
     'preventionMeasures',
+    'evidenceAndArtifacts',
+    'additionalDataRequirements',
     'fullRCAReport'
   ];
 
@@ -138,15 +147,195 @@ function ReportDisplay({ report }) {
         }
 
         if (key === 'severityAssessment' && typeof value === 'object') {
+          const severityMatch = value.severityMatch;
           return (
             <div key={key} className="report-block">
               <h3>{title}</h3>
-              {value.level && (
-                <div className={`severity-badge ${getSeverityClass(value.level)}`}>
-                  {value.level}
+              <div className="severity-comparison">
+                <div className="severity-item">
+                  <span className="severity-label">Initial Severity:</span>
+                  <div className={`severity-badge ${getSeverityClass(value.initialSeverity)}`}>
+                    {value.initialSeverity}
+                  </div>
+                </div>
+                <div className="severity-arrow">→</div>
+                <div className="severity-item">
+                  <span className="severity-label">AI-Assessed Severity:</span>
+                  <div className={`severity-badge ${getSeverityClass(value.aiAssessedSeverity)}`}>
+                    {value.aiAssessedSeverity}
+                  </div>
+                </div>
+                {!severityMatch && (
+                  <div className="severity-change-indicator">⚠️ Changed</div>
+                )}
+              </div>
+              {value.justification && (
+                <div className="severity-justification">
+                  <strong>Assessment Rationale:</strong> {value.justification}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        if (key === 'verdict' && typeof value === 'string') {
+          const verdictClass = value.toLowerCase().includes('false') ? 'verdict-false-positive' : 
+                              value.toLowerCase().includes('true') ? 'verdict-true-positive' : 
+                              'verdict-inconclusive';
+          return (
+            <div key={key} className="report-block">
+              <h3>Verdict</h3>
+              <div className={`verdict-badge ${verdictClass}`}>
+                {value}
+              </div>
+              {report.verdictRationale && (
+                <div className="verdict-rationale">
+                  <strong>Rationale:</strong> {report.verdictRationale}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        if (key === 'timelineOfEvents' && Array.isArray(value)) {
+          return (
+            <div key={key} className="report-block">
+              <h3>{title}</h3>
+              <div className="timeline-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Timestamp (UTC)</th>
+                      <th>Source</th>
+                      <th>Event/Action</th>
+                      <th>Notes</th>
+                      <th>Confidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {value.map((event, idx) => (
+                      <tr key={idx}>
+                        <td>{event.timestamp || event.time || '-'}</td>
+                        <td>{event.source || '-'}</td>
+                        <td>{event.eventAction || event.event || event.description || '-'}</td>
+                        <td>{event.notes || '-'}</td>
+                        <td>
+                          <span className={`confidence-${(event.confidence || 'unknown').toLowerCase()}`}>
+                            {event.confidence || '-'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        }
+
+        if (key === 'evidenceAndArtifacts' && typeof value === 'object') {
+          return (
+            <div key={key} className="report-block">
+              <h3>{title}</h3>
+              {value.logFieldInterpretation && Array.isArray(value.logFieldInterpretation) && (
+                <div className="subsection">
+                  <h4>Log Field Interpretation</h4>
+                  <table className="log-interpretation-table">
+                    <thead>
+                      <tr>
+                        <th>Field Name</th>
+                        <th>Value</th>
+                        <th>Interpretation</th>
+                        <th>Significance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {value.logFieldInterpretation.map((field, idx) => (
+                        <tr key={idx}>
+                          <td>{field.fieldName || '-'}</td>
+                          <td>{field.value || '-'}</td>
+                          <td>{field.interpretation || '-'}</td>
+                          <td>{field.significance || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {value.entityAppendices && (
+                <div className="entity-appendices">
+                  {value.entityAppendices.ipAddresses && value.entityAppendices.ipAddresses.length > 0 && (
+                    <div className="subsection">
+                      <h4>IP Address Analysis</h4>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>IP Address</th>
+                            <th>Geolocation</th>
+                            <th>Reputation</th>
+                            <th>First Seen</th>
+                            <th>Last Seen</th>
+                            <th>Activity</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {value.entityAppendices.ipAddresses.map((ip, idx) => (
+                            <tr key={idx}>
+                              <td>{ip.address || '-'}</td>
+                              <td>{ip.geolocation || '-'}</td>
+                              <td className={`reputation-${(ip.reputation || 'unknown').toLowerCase()}`}>
+                                {ip.reputation || '-'}
+                              </td>
+                              <td>{ip.firstSeen || '-'}</td>
+                              <td>{ip.lastSeen || '-'}</td>
+                              <td>{ip.activity || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
               <JsonRenderer data={value} />
+            </div>
+          );
+        }
+
+        if (key === 'followUpTasks' && Array.isArray(value)) {
+          return (
+            <div key={key} className="report-block">
+              <h3>Follow-Up Tasks</h3>
+              <table className="followup-table">
+                <thead>
+                  <tr>
+                    <th>Task</th>
+                    <th>Owner</th>
+                    <th>Due Date</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {value.map((task, idx) => (
+                    <tr key={idx}>
+                      <td>{task.task || task.description || '-'}</td>
+                      <td>{task.owner || '-'}</td>
+                      <td>{task.dueDate || '-'}</td>
+                      <td>
+                        <span className={`priority-${(task.priority || 'medium').toLowerCase()}`}>
+                          {task.priority || '-'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`status-${(task.status || 'pending').toLowerCase().replace(' ', '-')}`}>
+                          {task.status || '-'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           );
         }
