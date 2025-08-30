@@ -7,6 +7,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import './Dashboard.css';
+import AIChatPanel from './components/AIChatPanel';
+import ThreatIntelligence from './components/ThreatIntelligence';
 
 // Recursive component to render any JSON structure
 function JsonRenderer({ data, depth = 0 }) {
@@ -377,11 +379,21 @@ function Dashboard() {
   const [error, setError] = useState('');
   const [selectedIncident, setSelectedIncident] = useState(null);
   const [selectedIncidentDetails, setSelectedIncidentDetails] = useState(null);
+  const [quickLookIncident, setQuickLookIncident] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [showThreatIntel, setShowThreatIntel] = useState(false);
 
   useEffect(() => {
     fetchIncidents();
   }, []);
+
+  // Auto-show threat intelligence when incident is selected
+  useEffect(() => {
+    if (selectedIncident) {
+      setShowThreatIntel(true);
+    }
+  }, [selectedIncident]);
 
   const fetchIncidents = async () => {
     try {
@@ -502,6 +514,40 @@ function Dashboard() {
       </header>
 
       <main className="dashboard-main">
+        {/* AI Insights Section */}
+        <section className="ai-insights-section">
+          <div className="ai-insight-card">
+            <div className="ai-insight-header">
+              <svg className="ai-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+              <h3 className="ai-insight-title">AI Threat Detection</h3>
+            </div>
+            <div className="ai-insight-content">
+              <p>Active monitoring of {metrics.total} incidents with AI-powered analysis. 
+                {!selectedIncident ? 
+                  <strong> Select an incident from the table below to analyze.</strong> : 
+                  <strong> Incident {selectedIncident.id} selected for analysis.</strong>
+                }
+              </p>
+              <button 
+                className="ai-suggestion-chip"
+                onClick={() => setShowThreatIntel(!showThreatIntel)}
+                style={{ marginTop: '0.5rem' }}
+              >
+                {showThreatIntel ? 'Hide' : 'Show'} Threat Intelligence
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Show Threat Intelligence if toggled */}
+        {showThreatIntel && (
+          <section style={{ marginBottom: '2rem' }}>
+            <ThreatIntelligence incident={selectedIncident} />
+          </section>
+        )}
+
         {/* Key Metrics */}
         <section className="metrics-section">
           <div className="metric-card total">
@@ -604,7 +650,15 @@ function Dashboard() {
               </thead>
               <tbody>
                 {incidents.map(incident => (
-                  <tr key={incident.id}>
+                  <tr 
+                    key={incident.id} 
+                    onClick={() => setSelectedIncident(incident)} 
+                    style={{ 
+                      cursor: 'pointer',
+                      backgroundColor: selectedIncident?.id === incident.id ? '#e0f2fe' : 'transparent',
+                      transition: 'background-color 0.2s'
+                    }}
+                  >
                     <td>{format(new Date(incident.timestamp), 'MMM dd, HH:mm')}</td>
                     <td>{incident.type}</td>
                     <td>
@@ -627,25 +681,37 @@ function Dashboard() {
                     <td>{incident.affectedUsers?.join(', ') || 'N/A'}</td>
                     <td className="summary-cell">{incident.executiveSummary}</td>
                     <td>
-                      <button
-                        className="view-btn"
-                        onClick={async () => {
-                          setSelectedIncident(incident);
-                          setLoadingDetails(true);
-                          try {
-                            const response = await axios.get(`http://localhost:3002/incidents/${incident.id}`);
-                            setSelectedIncidentDetails(response.data);
-                          } catch (err) {
-                            console.error('Failed to fetch incident details:', err);
-                            // Fallback to basic incident data
-                            setSelectedIncidentDetails(null);
-                          } finally {
-                            setLoadingDetails(false);
-                          }
-                        }}
-                      >
-                        View
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          className="view-btn quick-look-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setQuickLookIncident(incident);
+                          }}
+                        >
+                          Quick Look
+                        </button>
+                        <button
+                          className="view-btn detailed-view-btn"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setSelectedIncident(incident);
+                            setLoadingDetails(true);
+                            try {
+                              const response = await axios.get(`http://localhost:3002/incidents/${incident.id}`);
+                              setSelectedIncidentDetails(response.data);
+                            } catch (err) {
+                              console.error('Failed to fetch incident details:', err);
+                              // Fallback to basic incident data
+                              setSelectedIncidentDetails(null);
+                            } finally {
+                              setLoadingDetails(false);
+                            }
+                          }}
+                        >
+                          Detailed View
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -655,9 +721,9 @@ function Dashboard() {
         </section>
 
         {/* Incident Detail Modal */}
-        {selectedIncident && (
+        {(quickLookIncident || selectedIncidentDetails) && (
           <div className="modal-overlay" onClick={() => {
-            setSelectedIncident(null);
+            setQuickLookIncident(null);
             setSelectedIncidentDetails(null);
           }}>
             <div className="modal-content incident-modal" onClick={e => e.stopPropagation()}>
@@ -668,20 +734,20 @@ function Dashboard() {
                 <div className="modal-report-container">
                   <ReportDisplay report={selectedIncidentDetails.report} />
                 </div>
-              ) : (
+              ) : quickLookIncident ? (
                 <div className="incident-details">
-                  <p><strong>ID:</strong> {selectedIncident.id}</p>
-                  <p><strong>Time:</strong> {format(new Date(selectedIncident.timestamp), 'PPpp')}</p>
-                  <p><strong>Type of Incident:</strong> {selectedIncident.type}</p>
-                  <p><strong>Severity:</strong> {selectedIncident.severity}</p>
-                  <p><strong>Status:</strong> {selectedIncident.status}</p>
-                  <p><strong>Response Time:</strong> {selectedIncident.responseTime} minutes</p>
-                  <p><strong>Affected Users:</strong> {selectedIncident.affectedUsers?.join(', ') || 'N/A'}</p>
-                  <p><strong>Executive Summary:</strong> {selectedIncident.executiveSummary}</p>
+                  <p><strong>ID:</strong> {quickLookIncident.id}</p>
+                  <p><strong>Time:</strong> {format(new Date(quickLookIncident.timestamp), 'PPpp')}</p>
+                  <p><strong>Type of Incident:</strong> {quickLookIncident.type}</p>
+                  <p><strong>Severity:</strong> {quickLookIncident.severity}</p>
+                  <p><strong>Status:</strong> {quickLookIncident.status}</p>
+                  <p><strong>Response Time:</strong> {quickLookIncident.responseTime} minutes</p>
+                  <p><strong>Affected Users:</strong> {quickLookIncident.affectedUsers?.join(', ') || 'N/A'}</p>
+                  <p><strong>Executive Summary:</strong> {quickLookIncident.executiveSummary}</p>
                 </div>
-              )}
+              ) : null}
               <button className="close-btn" onClick={() => {
-                setSelectedIncident(null);
+                setQuickLookIncident(null);
                 setSelectedIncidentDetails(null);
               }}>
                 Close
@@ -690,6 +756,37 @@ function Dashboard() {
           </div>
         )}
       </main>
+
+      {/* AI Chat Button */}
+      <div 
+        className="ai-chat-button" 
+        onClick={() => setShowAIChat(true)}
+        title={selectedIncident ? `Chat about incident ${selectedIncident.id}` : 'Open AI Chat'}
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+          <path d="M7 9h10v2H7zm0-3h10v2H7z"/>
+        </svg>
+        {selectedIncident && (
+          <div style={{
+            position: 'absolute',
+            top: '-5px',
+            right: '-5px',
+            background: '#ef4444',
+            borderRadius: '50%',
+            width: '10px',
+            height: '10px'
+          }}></div>
+        )}
+      </div>
+
+      {/* AI Chat Panel */}
+      <AIChatPanel 
+        isOpen={showAIChat} 
+        onClose={() => setShowAIChat(false)}
+        incident={selectedIncident}
+        allIncidents={incidents}
+      />
     </div>
   );
 }
