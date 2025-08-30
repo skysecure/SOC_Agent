@@ -2,17 +2,20 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import './AIChatPanel.css';
 
-function AIChatPanel({ isOpen, onClose, incident, allIncidents = [] }) {
+function AIChatPanel({ isOpen, onClose, chatIncident, chatMode, allIncidents = [] }) {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    if (isOpen && messages.length === 0) {
-      const welcomeMessage = incident 
-        ? `Hello! I'm your AI Security Assistant. I'm ready to help you analyze incident ${incident.id} (${incident.type}). This is a ${incident.severityAssessment?.aiAssessedSeverity || incident.severity} severity incident. What would you like to know?`
-        : `Hello! I'm your AI Security Assistant. I can help you analyze security incidents. Currently monitoring ${allIncidents.length} incidents. Select an incident from the dashboard to get started, or ask me about overall security trends.`;
+    if (isOpen) {
+      // Clear messages when opening with different mode or incident
+      setMessages([]);
+      
+      const welcomeMessage = chatMode === 'incident' && chatIncident
+        ? `Hello! I'm focusing on incident ${chatIncident.id} (${chatIncident.type}). This is a ${chatIncident.severityAssessment?.aiAssessedSeverity || chatIncident.severity} severity incident. How can I help you analyze this specific incident?`
+        : `Hello! I'm your AI Security Assistant monitoring ${allIncidents.length} total incidents. I can help you analyze trends, compare incidents, or answer general security questions. What would you like to know?`;
       
       setMessages([
         {
@@ -23,7 +26,7 @@ function AIChatPanel({ isOpen, onClose, incident, allIncidents = [] }) {
         }
       ]);
     }
-  }, [isOpen, incident, allIncidents.length, messages.length]);
+  }, [isOpen, chatIncident, chatMode, allIncidents.length]);
 
   useEffect(() => {
     scrollToBottom();
@@ -52,7 +55,8 @@ function AIChatPanel({ isOpen, onClose, incident, allIncidents = [] }) {
       // Call backend API to get Gemini response
       const response = await axios.post('http://localhost:3002/ai/chat', {
         query: inputValue,
-        currentIncident: incident,
+        currentIncident: chatMode === 'incident' ? chatIncident : null,
+        chatMode: chatMode,
         allIncidents: allIncidents,
         conversationHistory: messages
       });
@@ -66,7 +70,7 @@ function AIChatPanel({ isOpen, onClose, incident, allIncidents = [] }) {
     } catch (error) {
       console.error('AI Chat error:', error);
       // Fallback to local response generation
-      const aiResponse = generateAIResponse(inputValue, incident);
+      const aiResponse = generateAIResponse(inputValue, chatMode === 'incident' ? chatIncident : null);
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         type: 'ai',
@@ -154,7 +158,11 @@ function AIChatPanel({ isOpen, onClose, incident, allIncidents = [] }) {
       <div className="ai-chat-header">
         <div className="ai-chat-title">
           <div className="ai-status-indicator"></div>
-          <h3>AI Security Assistant</h3>
+          <h3>
+            {chatMode === 'incident' && chatIncident 
+              ? `Incident ${chatIncident.id} Analysis` 
+              : 'General Security Chat'}
+          </h3>
         </div>
         <button className="ai-chat-close" onClick={onClose}>×</button>
       </div>

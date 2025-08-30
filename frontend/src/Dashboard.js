@@ -383,6 +383,8 @@ function Dashboard() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [showAIChat, setShowAIChat] = useState(false);
   const [showThreatIntel, setShowThreatIntel] = useState(false);
+  const [chatIncident, setChatIncident] = useState(null);
+  const [chatMode, setChatMode] = useState('general');
 
   useEffect(() => {
     fetchIncidents();
@@ -711,6 +713,17 @@ function Dashboard() {
                         >
                           Detailed View
                         </button>
+                        <button
+                          className="view-btn ai-chat-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setChatIncident(incident);
+                            setChatMode('incident');
+                            setShowAIChat(true);
+                          }}
+                        >
+                          AI Chat
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -760,31 +773,29 @@ function Dashboard() {
       {/* AI Chat Button */}
       <div 
         className="ai-chat-button" 
-        onClick={() => setShowAIChat(true)}
-        title={selectedIncident ? `Chat about incident ${selectedIncident.id}` : 'Open AI Chat'}
+        onClick={() => {
+          setChatMode('general');
+          setChatIncident(null);
+          setShowAIChat(true);
+        }}
+        title="Open General AI Security Chat"
       >
         <svg viewBox="0 0 24 24" fill="currentColor">
           <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
           <path d="M7 9h10v2H7zm0-3h10v2H7z"/>
         </svg>
-        {selectedIncident && (
-          <div style={{
-            position: 'absolute',
-            top: '-5px',
-            right: '-5px',
-            background: '#ef4444',
-            borderRadius: '50%',
-            width: '10px',
-            height: '10px'
-          }}></div>
-        )}
       </div>
 
       {/* AI Chat Panel */}
       <AIChatPanel 
         isOpen={showAIChat} 
-        onClose={() => setShowAIChat(false)}
-        incident={selectedIncident}
+        onClose={() => {
+          setShowAIChat(false);
+          setChatIncident(null);
+          setChatMode('general');
+        }}
+        chatIncident={chatIncident}
+        chatMode={chatMode}
         allIncidents={incidents}
       />
     </div>

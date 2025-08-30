@@ -196,7 +196,7 @@ app.patch('/incidents/:id', async (req, res) => {
 // AI Chat endpoint
 app.post('/ai/chat', async (req, res) => {
   try {
-    const { query, currentIncident, allIncidents, conversationHistory } = req.body;
+    const { query, currentIncident, chatMode, allIncidents, conversationHistory } = req.body;
     
     // Create a context-aware prompt for Gemini
     const incidentContext = currentIncident ? `
@@ -225,7 +225,7 @@ Severity Distribution:
       `${msg.type === 'user' ? 'User' : 'Assistant'}: ${msg.text}`
     ).join('\n');
 
-    const prompt = `You are an AI Security Assistant helping analyze security incidents. Use the provided incident data to give accurate, specific responses.
+    const prompt = `You are an AI Security Assistant ${chatMode === 'incident' ? 'focusing on a specific incident' : 'providing general security analysis'}. Use the provided data to give accurate, specific responses.
 
 ${incidentContext}
 
