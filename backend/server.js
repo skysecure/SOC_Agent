@@ -16,22 +16,42 @@ const incidents = [];
 
 // Helper function to extract incident type from report
 function extractIncidentType(report) {
-  if (typeof report.incidentDetails === 'string') {
-    // Extract type from string if it contains patterns like "Type: XYZ"
-    const match = report.incidentDetails.match(/type[:\s]+([^,\n]+)/i);
-    return match ? match[1].trim() : 'Unknown Type';
-  }
-  
-  if (report.incidentDetails?.typeOfIncident) {
+  // First check the direct incidentDetails field
+  if (report.incidentDetails?.typeOfIncident && report.incidentDetails.typeOfIncident !== 'Unknown') {
     return report.incidentDetails.typeOfIncident;
   }
   
-  // Try to extract from fullRCAReport
+  // Check fullRCAReport for typeOfIncident
+  if (report.fullRCAReport?.incidentOverview?.typeOfIncident) {
+    return report.fullRCAReport.incidentOverview.typeOfIncident;
+  }
+  
+  // Check fullRCAReport title as fallback
   if (report.fullRCAReport?.incidentOverview?.title) {
     return report.fullRCAReport.incidentOverview.title;
   }
   
-  return 'Unknown Type';
+  // Try to extract from string if incidentDetails is a string
+  if (typeof report.incidentDetails === 'string') {
+    const match = report.incidentDetails.match(/type[:\s]+([^,\n]+)/i);
+    if (match) return match[1].trim();
+  }
+  
+  // Check executive summary for incident type keywords
+  if (report.executiveSummary) {
+    const summary = report.executiveSummary.toLowerCase();
+    if (summary.includes('ransomware')) return 'Ransomware Attack';
+    if (summary.includes('data exfiltration')) return 'Data Exfiltration';
+    if (summary.includes('brute force') || summary.includes('brute-force')) return 'Brute Force Attack';
+    if (summary.includes('phishing')) return 'Phishing Campaign';
+    if (summary.includes('malware')) return 'Malware Infection';
+    if (summary.includes('unauthorized access')) return 'Unauthorized Access';
+    if (summary.includes('privilege escalation')) return 'Privilege Escalation';
+    if (summary.includes('logic app')) return 'Logic App Modification';
+    if (summary.includes('insider threat')) return 'Insider Threat';
+  }
+  
+  return 'Security Incident';
 }
 
 // Helper function to extract affected users
@@ -43,12 +63,49 @@ function extractAffectedUsers(report) {
     users.push(...report.fullRCAReport.incidentOverview.affectedUPNUsers);
   }
   
+  if (report.fullRCAReport?.incidentOverview?.['affectedUPN/Users']) {
+    users.push(...report.fullRCAReport.incidentOverview['affectedUPN/Users']);
+  }
+  
+  if (report.incidentDetails?.affectedUsers && Array.isArray(report.incidentDetails.affectedUsers)) {
+    users.push(...report.incidentDetails.affectedUsers);
+  }
+  
   if (report.affectedUsers && Array.isArray(report.affectedUsers)) {
     users.push(...report.affectedUsers);
   }
   
   // Remove duplicates
   return [...new Set(users)];
+}
+
+// Helper function to calculate response time
+function calculateResponseTime(incidentData) {
+  try {
+    // Try multiple possible timestamp fields
+    const createdTime = new Date(
+      incidentData.properties?.createdTimeUtc || 
+      incidentData.properties?.['Created Time Utc'] ||
+      incidentData.createdTimeUtc ||
+      incidentData.timestamp ||
+      new Date()
+    );
+    
+    const lastModified = new Date(
+      incidentData.properties?.lastModifiedTimeUtc || 
+      incidentData.properties?.['Last Modified Time Utc'] ||
+      new Date()
+    );
+    
+    // Calculate difference in minutes
+    const diffInMinutes = Math.floor((lastModified - createdTime) / (1000 * 60));
+    
+    // Return at least 1 minute, max reasonable value
+    return Math.min(Math.max(diffInMinutes, 1), 10080); // Max 1 week
+  } catch (error) {
+    console.error('Error calculating response time:', error);
+    return 15; // Default fallback
+  }
 }
 
 app.post('/analyse', async (req, res) => {
@@ -67,7 +124,7 @@ app.post('/analyse', async (req, res) => {
       type: extractIncidentType(report),
       executiveSummary: report.executiveSummary,
       affectedUsers: extractAffectedUsers(report),
-      responseTime: Math.floor(Math.random() * 60) + 10 // Mock response time
+      responseTime: calculateResponseTime(incidentData)
     };
     
     incidents.unshift(incidentRecord); // Add to beginning of array

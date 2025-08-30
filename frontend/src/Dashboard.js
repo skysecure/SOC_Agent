@@ -8,11 +8,187 @@ import {
 } from 'recharts';
 import './Dashboard.css';
 
+// Recursive component to render any JSON structure
+function JsonRenderer({ data, depth = 0 }) {
+  // Handle null or undefined
+  if (data === null || data === undefined) {
+    return <span className="json-null">null</span>;
+  }
+
+  // Handle primitive types
+  if (typeof data === 'string') {
+    return <span className="json-string">{data}</span>;
+  }
+  
+  if (typeof data === 'number') {
+    return <span className="json-number">{data}</span>;
+  }
+  
+  if (typeof data === 'boolean') {
+    return <span className="json-boolean">{data.toString()}</span>;
+  }
+
+  // Handle arrays
+  if (Array.isArray(data)) {
+    if (data.length === 0) {
+      return <span className="json-empty">[]</span>;
+    }
+    
+    // Check if it's an array of primitives
+    const isPrimitiveArray = data.every(item => 
+      typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean'
+    );
+    
+    if (isPrimitiveArray) {
+      return (
+        <ul className="json-array-list">
+          {data.map((item, idx) => (
+            <li key={idx}><JsonRenderer data={item} depth={depth + 1} /></li>
+          ))}
+        </ul>
+      );
+    }
+    
+    // Array of objects
+    return (
+      <div className="json-array">
+        {data.map((item, idx) => (
+          <div key={idx} className="json-array-item">
+            <div className="json-array-index">[{idx}]</div>
+            <JsonRenderer data={item} depth={depth + 1} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Handle objects
+  if (typeof data === 'object') {
+    const entries = Object.entries(data);
+    if (entries.length === 0) {
+      return <span className="json-empty">{}</span>;
+    }
+
+    return (
+      <div className="json-object" style={{ marginLeft: depth > 0 ? '1rem' : '0' }}>
+        {entries.map(([key, value]) => {
+          const formattedKey = key
+            .replace(/([A-Z])/g, ' $1')
+            .replace(/^./, str => str.toUpperCase())
+            .replace(/_/g, ' ');
+
+          return (
+            <div key={key} className="json-property">
+              <div className="json-key">{formattedKey}:</div>
+              <div className="json-value">
+                <JsonRenderer data={value} depth={depth + 1} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Fallback for unknown types
+  return <span className="json-unknown">{String(data)}</span>;
+}
+
+// Main report component that organizes sections
+function ReportDisplay({ report }) {
+  // Define the preferred order of top-level keys
+  const preferredOrder = [
+    'executiveSummary',
+    'severityAssessment',
+    'incidentDetails',
+    'rootCauseAnalysis',
+    'impactAssessment',
+    'recommendedActions',
+    'preventionMeasures',
+    'fullRCAReport'
+  ];
+
+  // Get all keys and sort them according to preferred order
+  const allKeys = Object.keys(report);
+  const sortedKeys = [
+    ...preferredOrder.filter(key => allKeys.includes(key)),
+    ...allKeys.filter(key => !preferredOrder.includes(key))
+  ];
+
+  const getSeverityClass = (level) => {
+    if (!level) return '';
+    const severity = typeof level === 'string' ? level.toLowerCase() : '';
+    if (severity === 'critical') return 'severity-critical';
+    if (severity === 'high') return 'severity-high';
+    if (severity === 'medium') return 'severity-medium';
+    return 'severity-low';
+  };
+
+  return (
+    <div className="report-content">
+      {sortedKeys.map(key => {
+        const value = report[key];
+        const title = key
+          .replace(/([A-Z])/g, ' $1')
+          .replace(/^./, str => str.toUpperCase());
+
+        // Special handling for known sections
+        if (key === 'executiveSummary' && typeof value === 'string') {
+          return (
+            <div key={key} className="report-block">
+              <h3>{title}</h3>
+              <p className="executive-summary">{value}</p>
+            </div>
+          );
+        }
+
+        if (key === 'severityAssessment' && typeof value === 'object') {
+          return (
+            <div key={key} className="report-block">
+              <h3>{title}</h3>
+              {value.level && (
+                <div className={`severity-badge ${getSeverityClass(value.level)}`}>
+                  {value.level}
+                </div>
+              )}
+              <JsonRenderer data={value} />
+            </div>
+          );
+        }
+
+        if (key === 'fullRCAReport' && value) {
+          return (
+            <div key={key} className="report-block">
+              <h3>Full RCA Report</h3>
+              <details>
+                <summary>Click to expand full report</summary>
+                <div className="full-report-content">
+                  <JsonRenderer data={value} />
+                </div>
+              </details>
+            </div>
+          );
+        }
+
+        // Default rendering for all other sections
+        return (
+          <div key={key} className="report-block">
+            <h3>{title}</h3>
+            <JsonRenderer data={value} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Dashboard() {
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedIncident, setSelectedIncident] = useState(null);
+  const [selectedIncidentDetails, setSelectedIncidentDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
     fetchIncidents();
@@ -20,80 +196,23 @@ function Dashboard() {
 
   const fetchIncidents = async () => {
     try {
-      const response = await axios.get('http://10.99.8.8:3002/incidents');
+      const response = await axios.get('http://localhost:3002/incidents');
       setIncidents(response.data);
     } catch (err) {
-      setError('Failed to fetch incidents');
-      // Use mock data for development
-      setIncidents(getMockIncidents());
+      setError('Failed to fetch incidents: ' + (err.message || 'Unknown error'));
+      setIncidents([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const getMockIncidents = () => {
-    // Mock data for demonstration
-    return [
-      {
-        id: '1',
-        timestamp: new Date(Date.now() - 86400000 * 7),
-        severity: 'HIGH',
-        status: 'resolved',
-        type: 'Logic App Modification',
-        executiveSummary: 'User modified critical Logic App workflow',
-        affectedUsers: ['user1@example.com'],
-        responseTime: 45
-      },
-      {
-        id: '2',
-        timestamp: new Date(Date.now() - 86400000 * 5),
-        severity: 'MEDIUM',
-        status: 'investigating',
-        type: 'Unauthorized Access',
-        executiveSummary: 'Multiple failed login attempts detected',
-        affectedUsers: ['user2@example.com', 'user3@example.com'],
-        responseTime: 23
-      },
-      {
-        id: '3',
-        timestamp: new Date(Date.now() - 86400000 * 3),
-        severity: 'CRITICAL',
-        status: 'resolved',
-        type: 'Data Exfiltration',
-        executiveSummary: 'Potential data exfiltration detected',
-        affectedUsers: ['admin@example.com'],
-        responseTime: 12
-      },
-      {
-        id: '4',
-        timestamp: new Date(Date.now() - 86400000 * 2),
-        severity: 'LOW',
-        status: 'resolved',
-        type: 'Policy Violation',
-        executiveSummary: 'User violated security policy',
-        affectedUsers: ['user4@example.com'],
-        responseTime: 67
-      },
-      {
-        id: '5',
-        timestamp: new Date(Date.now() - 86400000),
-        severity: 'MEDIUM',
-        status: 'new',
-        type: 'Suspicious Activity',
-        executiveSummary: 'Unusual API activity detected',
-        affectedUsers: ['service@example.com'],
-        responseTime: 34
-      }
-    ];
-  };
-
   // Calculate metrics
   const metrics = {
     total: incidents.length,
-    critical: incidents.filter(i => i.severity === 'CRITICAL').length,
-    high: incidents.filter(i => i.severity === 'HIGH').length,
-    medium: incidents.filter(i => i.severity === 'MEDIUM').length,
-    low: incidents.filter(i => i.severity === 'LOW').length,
+    high: incidents.filter(i => i.severity?.toLowerCase() === 'high').length,
+    medium: incidents.filter(i => i.severity?.toLowerCase() === 'medium').length,
+    low: incidents.filter(i => i.severity?.toLowerCase() === 'low').length,
+    informational: incidents.filter(i => i.severity?.toLowerCase() === 'informational').length,
     resolved: incidents.filter(i => i.status === 'resolved').length,
     investigating: incidents.filter(i => i.status === 'investigating').length,
     new: incidents.filter(i => i.status === 'new').length,
@@ -104,10 +223,10 @@ function Dashboard() {
 
   // Prepare data for charts
   const severityData = [
-    { name: 'Critical', value: metrics.critical, color: '#d32f2f' },
-    { name: 'High', value: metrics.high, color: '#f57c00' },
-    { name: 'Medium', value: metrics.medium, color: '#fbc02d' },
-    { name: 'Low', value: metrics.low, color: '#388e3c' }
+    { name: 'High', value: metrics.high, color: '#d32f2f' },
+    { name: 'Medium', value: metrics.medium, color: '#f57c00' },
+    { name: 'Low', value: metrics.low, color: '#fbc02d' },
+    { name: 'Informational', value: metrics.informational, color: '#388e3c' }
   ];
 
   const statusData = [
@@ -130,10 +249,11 @@ function Dashboard() {
 
   const getSeverityClass = (severity) => {
     const level = severity?.toLowerCase();
-    if (level === 'critical') return 'severity-critical';
     if (level === 'high') return 'severity-high';
     if (level === 'medium') return 'severity-medium';
-    return 'severity-low';
+    if (level === 'low') return 'severity-low';
+    if (level === 'informational') return 'severity-informational';
+    return 'severity-medium'; // default
   };
 
   const getStatusClass = (status) => {
@@ -164,19 +284,19 @@ function Dashboard() {
             <div className="metric-value">{metrics.total}</div>
             <p>Last 30 days</p>
           </div>
-          <div className="metric-card critical">
-            <h3>Critical</h3>
-            <div className="metric-value">{metrics.critical}</div>
-            <p>{((metrics.critical / metrics.total) * 100).toFixed(1)}% of total</p>
+          <div className="metric-card high">
+            <h3>High Severity</h3>
+            <div className="metric-value">{metrics.high}</div>
+            <p>{metrics.total > 0 ? ((metrics.high / metrics.total) * 100).toFixed(1) : 0}% of total</p>
           </div>
           <div className="metric-card resolved">
             <h3>Resolved</h3>
             <div className="metric-value">{metrics.resolved}</div>
-            <p>{((metrics.resolved / metrics.total) * 100).toFixed(1)}% resolution rate</p>
+            <p>{metrics.total > 0 ? ((metrics.resolved / metrics.total) * 100).toFixed(1) : 0}% resolution rate</p>
           </div>
           <div className="metric-card response">
             <h3>Avg Response Time</h3>
-            <div className="metric-value">{metrics.avgResponseTime}m</div>
+            <div className="metric-value">{metrics.avgResponseTime}ms</div>
             <p>Minutes to first action</p>
           </div>
         </section>
@@ -273,7 +393,20 @@ function Dashboard() {
                     <td>
                       <button
                         className="view-btn"
-                        onClick={() => setSelectedIncident(incident)}
+                        onClick={async () => {
+                          setSelectedIncident(incident);
+                          setLoadingDetails(true);
+                          try {
+                            const response = await axios.get(`http://localhost:3002/incidents/${incident.id}`);
+                            setSelectedIncidentDetails(response.data);
+                          } catch (err) {
+                            console.error('Failed to fetch incident details:', err);
+                            // Fallback to basic incident data
+                            setSelectedIncidentDetails(null);
+                          } finally {
+                            setLoadingDetails(false);
+                          }
+                        }}
                       >
                         View
                       </button>
@@ -287,19 +420,34 @@ function Dashboard() {
 
         {/* Incident Detail Modal */}
         {selectedIncident && (
-          <div className="modal-overlay" onClick={() => setSelectedIncident(null)}>
-            <div className="modal-content" onClick={e => e.stopPropagation()}>
-              <h2>Incident Details</h2>
-              <div className="incident-details">
-                <p><strong>ID:</strong> {selectedIncident.id}</p>
-                <p><strong>Time:</strong> {format(new Date(selectedIncident.timestamp), 'PPpp')}</p>
-                <p><strong>Type:</strong> {selectedIncident.type}</p>
-                <p><strong>Severity:</strong> {selectedIncident.severity}</p>
-                <p><strong>Status:</strong> {selectedIncident.status}</p>
-                <p><strong>Response Time:</strong> {selectedIncident.responseTime} minutes</p>
-                <p><strong>Summary:</strong> {selectedIncident.executiveSummary}</p>
-              </div>
-              <button className="close-btn" onClick={() => setSelectedIncident(null)}>
+          <div className="modal-overlay" onClick={() => {
+            setSelectedIncident(null);
+            setSelectedIncidentDetails(null);
+          }}>
+            <div className="modal-content incident-modal" onClick={e => e.stopPropagation()}>
+              <h2>Incident Analysis Report</h2>
+              {loadingDetails ? (
+                <div className="loading">Loading detailed report...</div>
+              ) : selectedIncidentDetails?.report ? (
+                <div className="modal-report-container">
+                  <ReportDisplay report={selectedIncidentDetails.report} />
+                </div>
+              ) : (
+                <div className="incident-details">
+                  <p><strong>ID:</strong> {selectedIncident.id}</p>
+                  <p><strong>Time:</strong> {format(new Date(selectedIncident.timestamp), 'PPpp')}</p>
+                  <p><strong>Type of Incident:</strong> {selectedIncident.type}</p>
+                  <p><strong>Severity:</strong> {selectedIncident.severity}</p>
+                  <p><strong>Status:</strong> {selectedIncident.status}</p>
+                  <p><strong>Response Time:</strong> {selectedIncident.responseTime} minutes</p>
+                  <p><strong>Affected Users:</strong> {selectedIncident.affectedUsers?.join(', ') || 'N/A'}</p>
+                  <p><strong>Executive Summary:</strong> {selectedIncident.executiveSummary}</p>
+                </div>
+              )}
+              <button className="close-btn" onClick={() => {
+                setSelectedIncident(null);
+                setSelectedIncidentDetails(null);
+              }}>
                 Close
               </button>
             </div>

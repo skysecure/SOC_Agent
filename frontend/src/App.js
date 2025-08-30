@@ -191,7 +191,7 @@ function App() {
     http://10.217.108.8/
     try {
       const parsedData = JSON.parse(incidentData);
-      const response = await axios.post('http://10.217.108.8:3002/analyse', parsedData);
+      const response = await axios.post('http://localhost:3002/analyse', parsedData);
       setReport(response.data);
     } catch (err) {
       if (err.message.includes('JSON')) {
