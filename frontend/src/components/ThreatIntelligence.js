@@ -4,136 +4,74 @@ import './ThreatIntelligence.css';
 function ThreatIntelligence({ incident }) {
   const [threatData, setThreatData] = useState(null);
   const [loading, setLoading] = useState(true);
-console.log(incident,"  ");
+  const [error, setError] = useState(null);
   useEffect(() => {
     if (!incident) {
       setLoading(false);
       return;
     }
     
-    // Generate threat intelligence based on actual incident data
-    const generateThreatIntelligence = () => {
-      // Calculate threat score based on severity and incident details
-      const severityScores = {
-        'critical': 90,
-        'high': 75,
-        'medium': 50,
-        'low': 25,
-        'informational': 10
-      };
-      
-      const severity = incident.severityAssessment?.aiAssessedSeverity || incident.severity || 'medium';
-      const baseThreatScore = severityScores[severity.toLowerCase()] || 50;
-      
-      // Extract IPs and domains from incident data
-      const extractedIPs = [];
-      const extractedDomains = [];
-      
-      // Check for IPs in evidence
-      if (incident.evidenceAndArtifacts?.entityAppendices?.ipAddresses) {
-        incident.evidenceAndArtifacts.entityAppendices.ipAddresses.forEach(ip => {
-          extractedIPs.push({
-            ip: ip.address,
-            reputation: ip.reputation || 'Unknown',
-            geoLocation: ip.geolocation || 'Unknown',
-            confidence: Math.floor(Math.random() * 30) + 70
-          });
-        });
-      }
-      
-      // Extract from incident description if available
-      const ipRegex = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g;
-      const description = JSON.stringify(incident);
-      const foundIPs = description.match(ipRegex) || [];
-      foundIPs.forEach(ip => {
-        if (!extractedIPs.find(item => item.ip === ip)) {
-          extractedIPs.push({
-            ip: ip,
-            reputation: 'Under Investigation',
-            geoLocation: 'Unknown',
-            confidence: 65
-          });
+    // Fetch dynamic threat intelligence from API
+    const fetchThreatIntelligence = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await fetch(`http://localhost:3002/api/threat-intelligence/${incident.id}`);
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
         }
-      });
-      
-      // Generate related threats based on incident type
-      const relatedThreats = [];
-      const incidentType = (incident.type || '').toLowerCase();
-      
-      if (incidentType.includes('malware') || incidentType.includes('ransomware')) {
-        relatedThreats.push({
-          id: 1,
-          name: 'Ransomware - LockBit 3.0',
-          similarity: Math.floor(Math.random() * 30) + 60,
-          lastSeen: '3 days ago',
-          tactics: ['Execution', 'Impact', 'Exfiltration']
-        });
+        
+        const threatData = await response.json();
+        console.log('Received threat data:', threatData);
+        setThreatData(threatData);
+      } catch (error) {
+        console.error('Failed to fetch threat intelligence:', error);
+        setError(error.message);
+        
+        // Fallback to basic analysis using incident data
+        const generateFallbackData = () => {
+          const severity = incident.severityAssessment?.aiAssessedSeverity || incident.severity || 'medium';
+          const hasHighSeverity = severity.toLowerCase() === 'high' || severity.toLowerCase() === 'critical';
+          
+          return {
+            threatScore: hasHighSeverity ? 75 : 50,
+            confidence: 'Medium',
+            relatedThreats: [{
+              id: 1,
+              name: `${incident.type} Pattern`,
+              similarity: 65,
+              lastSeen: '1 week ago',
+              tactics: ['Discovery', 'Collection']
+            }],
+            indicators: {
+              ipAddresses: incident.report?.evidenceAndArtifacts?.entityAppendices?.ipAddresses?.length > 0 
+                ? incident.report.evidenceAndArtifacts.entityAppendices.ipAddresses.map(ip => ({
+                    ip: ip.address || ip.ip,
+                    reputation: ip.reputation || 'Unknown',
+                    geoLocation: ip.geolocation || ip.geoLocation || 'Unknown',
+                    confidence: 75
+                  }))
+                : [{ ip: 'No IPs extracted from incident data', reputation: 'N/A', geoLocation: 'N/A', confidence: 0 }],
+              domains: [{ domain: 'Analysis temporarily unavailable', status: 'N/A', firstSeen: 'N/A' }],
+              hashes: [{ hash: 'Analysis temporarily unavailable', type: 'N/A', malware: 'N/A' }]
+            },
+            predictions: {
+              escalationProbability: hasHighSeverity ? 70 : 35,
+              estimatedImpact: hasHighSeverity ? 'High' : 'Medium',
+              timeToContainment: hasHighSeverity ? '2-4 hours' : '4-8 hours',
+              recommendedPriority: hasHighSeverity ? 'Critical' : 'High'
+            }
+          };
+        };
+        
+        setThreatData(generateFallbackData());
+      } finally {
+        setLoading(false);
       }
-      
-      if (incidentType.includes('phishing') || incidentType.includes('credential')) {
-        relatedThreats.push({
-          id: 2,
-          name: 'Phishing Campaign - TA505',
-          similarity: Math.floor(Math.random() * 30) + 55,
-          lastSeen: '1 week ago',
-          tactics: ['Initial Access', 'Credential Access']
-        });
-      }
-      
-      if (incidentType.includes('brute') || incidentType.includes('authentication')) {
-        relatedThreats.push({
-          id: 3,
-          name: 'Brute Force Attack Pattern',
-          similarity: Math.floor(Math.random() * 30) + 70,
-          lastSeen: '2 days ago',
-          tactics: ['Credential Access', 'Persistence']
-        });
-      }
-      
-      // Always add a generic APT if no specific threats
-      if (relatedThreats.length === 0) {
-        relatedThreats.push({
-          id: 1,
-          name: 'Unknown APT Activity',
-          similarity: Math.floor(Math.random() * 30) + 40,
-          lastSeen: '1 week ago',
-          tactics: ['Discovery', 'Collection', 'Exfiltration']
-        });
-      }
-      
-      // Calculate predictions based on incident data
-      const hasHighSeverity = severity.toLowerCase() === 'high' || severity.toLowerCase() === 'critical';
-      const escalationProbability = hasHighSeverity ? 
-        Math.floor(Math.random() * 30) + 60 : 
-        Math.floor(Math.random() * 30) + 20;
-      
-      return {
-        threatScore: baseThreatScore + Math.floor(Math.random() * 15),
-        confidence: hasHighSeverity ? 'High' : 'Medium',
-        relatedThreats: relatedThreats,
-        indicators: {
-          ipAddresses: extractedIPs.length > 0 ? extractedIPs : [
-            { ip: 'No IPs extracted', reputation: 'N/A', geoLocation: 'N/A', confidence: 0 }
-          ],
-          domains: extractedDomains.length > 0 ? extractedDomains : [
-            { domain: 'No domains found', status: 'N/A', firstSeen: 'N/A' }
-          ],
-          hashes: []
-        },
-        predictions: {
-          escalationProbability: escalationProbability,
-          estimatedImpact: hasHighSeverity ? 'High' : 'Medium',
-          timeToContainment: hasHighSeverity ? '2-4 hours' : '4-8 hours',
-          recommendedPriority: hasHighSeverity ? 'Critical' : 'High'
-        }
-      };
     };
     
-    // Simulate API call delay
-    setTimeout(() => {
-      setThreatData(generateThreatIntelligence());
-      setLoading(false);
-    }, 500);
+    fetchThreatIntelligence();
   }, [incident]);
 
   if (!incident) {
@@ -149,11 +87,16 @@ console.log(incident,"  ");
     );
   }
 
-  if (loading) {
+  if (loading || !threatData) {
     return (
       <div className="threat-intelligence-loading">
         <div className="loading-spinner"></div>
-        <p>Analyzing threat intelligence...</p>
+        <p>{error ? `Error: ${error}` : 'Analyzing threat intelligence...'}</p>
+        {error && (
+          <p style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
+            Falling back to basic analysis...
+          </p>
+        )}
       </div>
     );
   }
@@ -164,8 +107,8 @@ console.log(incident,"  ");
         <h3>AI-Powered Threat Intelligence</h3>
         <div className="threat-score">
           <span className="score-label">Threat Score</span>
-          <span className="score-value" style={{ color: threatData.threatScore > 70 ? '#ef4444' : '#f59e0b' }}>
-            {threatData.threatScore}/100
+          <span className="score-value" style={{ color: (threatData?.threatScore || 0) > 70 ? '#ef4444' : '#f59e0b' }}>
+            {threatData?.threatScore || 0}/100
           </span>
         </div>
       </div>
@@ -173,21 +116,21 @@ console.log(incident,"  ");
       <div className="threat-overview">
         <div className="overview-item">
           <span className="overview-label">Confidence Level</span>
-          <span className={`overview-value confidence-${threatData.confidence.toLowerCase()}`}>
-            {threatData.confidence}
+          <span className={`overview-value confidence-${threatData?.confidence?.toLowerCase() || 'medium'}`}>
+            {threatData?.confidence || 'Medium'}
           </span>
         </div>
         <div className="overview-item">
           <span className="overview-label">Priority</span>
           <span className="overview-value priority-critical">
-            {threatData.predictions.recommendedPriority}
+            {threatData?.predictions?.recommendedPriority || 'High'}
           </span>
         </div>
       </div>
 
       <div className="related-threats">
         <h4>Related Threat Patterns</h4>
-        {threatData.relatedThreats.map(threat => (
+        {(threatData?.relatedThreats || []).map(threat => (
           <div key={threat.id} className="threat-card">
             <div className="threat-card-header">
               <h5>{threat.name}</h5>
@@ -208,10 +151,10 @@ console.log(incident,"  ");
         
         <div className="indicator-section">
           <h5>🌐 IP Addresses</h5>
-          {threatData.indicators.ipAddresses.map((ip, index) => (
+          {(threatData?.indicators?.ipAddresses || []).map((ip, index) => (
             <div key={index} className="indicator-item">
               <span className="indicator-value">{ip.ip}</span>
-              <span className={`indicator-status ${ip.reputation.toLowerCase()}`}>
+              <span className={`indicator-status ${ip.reputation ? ip.reputation.toLowerCase() : 'unknown'}`}>
                 {ip.reputation}
               </span>
               <span className="indicator-meta">{ip.geoLocation} • {ip.confidence}% confidence</span>
@@ -221,16 +164,33 @@ console.log(incident,"  ");
 
         <div className="indicator-section">
           <h5>🔗 Domains</h5>
-          {threatData.indicators.domains.map((domain, index) => (
+          {(threatData?.indicators?.domains || []).map((domain, index) => (
             <div key={index} className="indicator-item">
               <span className="indicator-value">{domain.domain}</span>
-              <span className={`indicator-status ${domain.status.toLowerCase()}`}>
+              <span className={`indicator-status ${domain.status ? domain.status.toLowerCase() : 'unknown'}`}>
                 {domain.status}
               </span>
               <span className="indicator-meta">First seen: {domain.firstSeen}</span>
             </div>
           ))}
         </div>
+
+        {threatData?.indicators?.hashes && threatData.indicators.hashes.length > 0 && (
+          <div className="indicator-section">
+            <h5>🔒 File Hashes</h5>
+            {(threatData?.indicators?.hashes || []).map((hash, index) => (
+              <div key={index} className="indicator-item">
+                <span className="indicator-value">{hash.hash}</span>
+                <span className={`indicator-status ${hash.type ? hash.type.toLowerCase() : 'unknown'}`}>
+                  {hash.type || 'Unknown'}
+                </span>
+                <span className="indicator-meta">
+                  {hash.malware ? `Associated: ${hash.malware}` : 'No malware association'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="threat-predictions">
@@ -242,20 +202,20 @@ console.log(incident,"  ");
               <div 
                 className="prediction-fill"
                 style={{ 
-                  width: `${threatData.predictions.escalationProbability}%`,
-                  background: threatData.predictions.escalationProbability > 70 ? '#ef4444' : '#f59e0b'
+                  width: `${threatData?.predictions?.escalationProbability || 0}%`,
+                  background: (threatData?.predictions?.escalationProbability || 0) > 70 ? '#ef4444' : '#f59e0b'
                 }}
               ></div>
             </div>
-            <span className="prediction-value">{threatData.predictions.escalationProbability}%</span>
+            <span className="prediction-value">{threatData?.predictions?.escalationProbability || 0}%</span>
           </div>
           <div className="prediction-item">
             <span className="prediction-label">Estimated Impact</span>
-            <span className="prediction-value impact-high">{threatData.predictions.estimatedImpact}</span>
+            <span className="prediction-value impact-high">{threatData?.predictions?.estimatedImpact || 'Medium'}</span>
           </div>
           <div className="prediction-item">
             <span className="prediction-label">Time to Contain</span>
-            <span className="prediction-value">{threatData.predictions.timeToContainment}</span>
+            <span className="prediction-value">{threatData?.predictions?.timeToContainment || '4-8 hours'}</span>
           </div>
         </div>
       </div>

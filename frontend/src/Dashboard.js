@@ -451,9 +451,9 @@ function Dashboard() {
     medium: incidents.filter(i => i.severity?.toLowerCase() === 'medium').length,
     low: incidents.filter(i => i.severity?.toLowerCase() === 'low').length,
     informational: incidents.filter(i => i.severity?.toLowerCase() === 'informational').length,
-    resolved: incidents.filter(i => i.status === 'resolved').length,
-    investigating: incidents.filter(i => i.status === 'investigating').length,
-    new: incidents.filter(i => i.status === 'new').length,
+    closed: incidents.filter(i => i.status === 'Closed').length,
+    active: incidents.filter(i => i.status === 'Active').length,
+    new: incidents.filter(i => i.status === 'New').length,
     avgResponseTime: incidents.length > 0 
       ? Math.round(incidents.reduce((sum, i) => sum + (i.responseTime || 0), 0) / incidents.length)
       : 0
@@ -468,8 +468,8 @@ function Dashboard() {
   ];
 
   const statusData = [
-    { name: 'Resolved', value: metrics.resolved, color: '#4caf50' },
-    { name: 'Investigating', value: metrics.investigating, color: '#ff9800' },
+    { name: 'Closed', value: metrics.closed, color: '#4caf50' },
+    { name: 'Active', value: metrics.active, color: '#ff9800' },
     { name: 'New', value: metrics.new, color: '#f44336' }
   ];
 
@@ -496,8 +496,8 @@ function Dashboard() {
   };
 
   const getStatusClass = (status) => {
-    if (status === 'resolved') return 'status-resolved';
-    if (status === 'investigating') return 'status-investigating';
+    if (status === 'closed') return 'status-closed';
+    if (status === 'active') return 'status-active';
     return 'status-new';
   };
 
@@ -562,10 +562,10 @@ function Dashboard() {
             <div className="metric-value">{metrics.high}</div>
             <p>{metrics.total > 0 ? ((metrics.high / metrics.total) * 100).toFixed(1) : 0}% of total</p>
           </div>
-          <div className="metric-card resolved">
-            <h3>Resolved</h3>
-            <div className="metric-value">{metrics.resolved}</div>
-            <p>{metrics.total > 0 ? ((metrics.resolved / metrics.total) * 100).toFixed(1) : 0}% resolution rate</p>
+          <div className="metric-card closed">
+            <h3>Closed</h3>
+            <div className="metric-value">{metrics.closed}</div>
+            <p>{metrics.total > 0 ? ((metrics.closed / metrics.total) * 100).toFixed(1) : 0}% closure rate</p>
           </div>
           <div className="metric-card response">
             <h3>Avg Response Time</h3>
