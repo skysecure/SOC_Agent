@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { analyzeIncident } from './services/geminiService.js';
 import { updateSentinelIncident, validateSentinelConnection } from './services/sentinelService.js';
+import { generateOutlookHtmlFromRCA } from './services/emailTemplateService.js';
+import { mailSender } from './services/mailService.js';
 
 dotenv.config();
 
@@ -112,14 +114,37 @@ function calculateResponseTime(incidentData) {
 app.post('/analyse', async (req, res) => {
   try {
     const incidentData = req.body;
+
+    // Acknowledgement email to TOSENDERMAIL
+    try {
+      const ackTo = process.env.TOSENDERMAIL || process.env.SENTINEL_OWNER_EMAIL || process.env.SENDGRID_FROM_EMAIL;
+      const ackSubject = 'Incident Acknowledgement';
+      const ackHtml = `<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#202124">`+
+        `<p>We have noted the incident and it is currently under investigation.</p>`+
+        `<p>Incident title: ${incidentData?.properties?.title || incidentData?.properties?.alertDisplayName || 'Security Incident'}</p>`+
+        `<p>Timestamp (UTC): ${incidentData?.properties?.createdTimeUtc || incidentData?.createdTimeUtc || new Date().toISOString()}</p>`+
+      `</div>`;
+      if (ackTo) {
+        console.log('[EMAIL][ACK] Sending acknowledgement', { to: ackTo, subject: ackSubject });
+        await mailSender(ackTo, ackSubject, ackHtml);
+        console.log('[EMAIL][ACK] Acknowledgement sent');
+      } else {
+        console.log('[EMAIL][ACK] Skipped (no TOSENDERMAIL/SENTINEL_OWNER_EMAIL/SENDGRID_FROM_EMAIL configured)');
+      }
+    } catch (ackError) {
+      console.error('[EMAIL][ACK] Failed to send acknowledgement:', ackError?.message);
+    }
+
+    console.log('[ANALYSE] Starting RCA generation');
     const report = await analyzeIncident(incidentData);
+    console.log('[ANALYSE] RCA generated');
     
     // Extract AI-assessed severity from the report
     const aiSeverity = report.severityAssessment?.aiAssessedSeverity || 
                       report.severityAssessment?.initialSeverity || 
                       'medium'; // Safe fallback
     
-    console.log('RCA Analysis completed:', {
+    console.log('[ANALYSE] RCA Summary', {
       incidentType: extractIncidentType(report),
       initialSeverity: report.severityAssessment?.initialSeverity,
       aiAssessedSeverity: aiSeverity,
@@ -141,6 +166,7 @@ app.post('/analyse', async (req, res) => {
     };
     
     incidents.unshift(incidentRecord); // Add to beginning of array
+    console.log('[ANALYSE] Incident stored in memory', { id: incidentRecord.id });
     
     // Auto-assign incident in Sentinel if configuration is available
     let assignmentResult = null;
@@ -157,83 +183,53 @@ app.post('/analyse', async (req, res) => {
       
       if (incidentArmId) {
         const DEBUG = process.env.SENTINEL_DEBUG === 'true';
-        console.log('🚀 Attempting Sentinel auto-assignment');
-        
-        if (DEBUG) {
-          console.log('Sentinel update request details:', {
-            armId: incidentArmId,
-            aiSeverity: aiSeverity,
-            assignTo: process.env.SENTINEL_OWNER_EMAIL,
-            initialSeverity: report.severityAssessment?.initialSeverity,
-            severityConfidence: report.severityAssessment?.confidence,
-            incidentType: incidentRecord.type,
-            timestamp: new Date().toISOString()
-          });
-        }
+        console.log('[SENTINEL] Attempting auto-assignment/update', { incidentArmId, aiSeverity });
         
         const sentinelStartTime = Date.now();
         
-        // Pass AI-assessed severity to Sentinel update
+        // Pass AI-assessed severity to Sentinel update (owner/status taken from env)
         assignmentResult = await updateSentinelIncident(
           incidentArmId,
-          aiSeverity, // Using AI severity, not hardcoded
+          aiSeverity,
           {
-            description: `RCA completed by SOC Automation Agent. 
-AI-Assessed Severity: ${aiSeverity} (Initial: ${report.severityAssessment?.initialSeverity})
-Type: ${incidentRecord.type}
-Executive Summary: ${incidentRecord.executiveSummary?.substring(0, 500)}...
-Analysis Timestamp: ${new Date().toISOString()}`
+            description: `RCA completed by SOC Automation Agent. \nAI-Assessed Severity: ${aiSeverity} (Initial: ${report.severityAssessment?.initialSeverity})\nType: ${incidentRecord.type}\nExecutive Summary: ${incidentRecord.executiveSummary?.substring(0, 500)}...\nAnalysis Timestamp: ${new Date().toISOString()}`
           }
         );
         
         const sentinelDuration = Date.now() - sentinelStartTime;
-        
-        // Store assignment result
         incidentRecord.sentinelAssignment = assignmentResult;
-        
-        if (assignmentResult.success) {
-          console.log(`✅ Sentinel assignment successful (${sentinelDuration}ms)`);
-          
-          if (DEBUG) {
-            console.log('Sentinel assignment details:', {
-              incidentId: assignmentResult.incidentId,
-              severity: assignmentResult.severity,
-              assignedTo: assignmentResult.assignedTo,
-              requestDuration: assignmentResult.requestDuration,
-              totalDuration: sentinelDuration,
-              etag: assignmentResult.response?.etag
-            });
-          }
+        if (assignmentResult?.success) {
+          console.log(`[SENTINEL] Update successful (${sentinelDuration}ms)`, {
+            incidentId: assignmentResult.incidentId,
+            severity: assignmentResult.severity
+          });
         } else {
-          console.error(`❌ Sentinel assignment failed (${sentinelDuration}ms)`);
-          
-          if (DEBUG) {
-            console.error('Sentinel failure details:', {
-              error: assignmentResult.error,
-              status: assignmentResult.status,
-              incidentId: assignmentResult.incidentId,
-              attemptDuration: sentinelDuration
-            });
-          }
+          console.error(`[SENTINEL] Update failed (${sentinelDuration}ms)`, assignmentResult);
         }
       } else {
-        console.log('No incident ID found in request, skipping Sentinel assignment');
-        console.log('Available paths checked:', {
-          'object.id': incidentData.object?.id,
-          'id': incidentData.id,
-          'properties.id': incidentData.properties?.id,
-          'name': incidentData.name
-        });
+        console.log('[SENTINEL] Skipping update (no incident ARM id found)');
       }
     } else {
-      console.log('Sentinel integration not fully configured');
-      const missingConfigs = [];
-      if (!process.env.AZURE_CLIENT_ID) missingConfigs.push('AZURE_CLIENT_ID');
-      if (!process.env.AZURE_CLIENT_SECRET) missingConfigs.push('AZURE_CLIENT_SECRET');
-      if (!process.env.AZURE_SUBSCRIPTION_ID) missingConfigs.push('AZURE_SUBSCRIPTION_ID');
-      console.log('Missing configurations:', missingConfigs);
+      console.log('[SENTINEL] Skipping update (config not set)');
     }
-    
+
+    // Final RCA email to TOSENDERMAIL
+    try {
+      const to = process.env.TOSENDERMAIL || process.env.SENTINEL_OWNER_EMAIL || process.env.SENDGRID_FROM_EMAIL;
+      const subject = `RCA Report: ${incidentRecord.type} (Severity: ${aiSeverity})`;
+      if (to) {
+        console.log('[EMAIL][RCA] Generating Outlook-safe HTML');
+        const html = await generateOutlookHtmlFromRCA(report);
+        console.log('[EMAIL][RCA] Sending RCA email', { to, subject, htmlLength: html?.length || 0 });
+        await mailSender(to, subject, html);
+        console.log('[EMAIL][RCA] RCA email sent');
+      } else {
+        console.log('[EMAIL][RCA] Skipped (no TOSENDERMAIL/SENTINEL_OWNER_EMAIL/SENDGRID_FROM_EMAIL configured)');
+      }
+    } catch (rcaEmailError) {
+      console.error('[EMAIL][RCA] Failed to send RCA email:', rcaEmailError?.message);
+    }
+
     // Add assignment result to response
     const response = {
       ...report,
@@ -868,6 +864,47 @@ app.get('/sentinel/health', async (req, res) => {
       error: error.message,
       checkDuration: duration
     });
+  }
+});
+
+// Generate and email RCA report
+app.post('/email/rca', async (req, res) => {
+  try {
+    const { to, subject = 'Incident RCA Report', report, incidentData } = req.body;
+    console.log('[EMAIL] /email/rca request', {
+      toPreview: to ? `${to.substring(0, 3)}***` : 'MISSING',
+      hasReport: !!report,
+      hasIncidentData: !!incidentData
+    });
+    if (!to) {
+      return res.status(400).json({ error: '`to` is required' });
+    }
+
+    let rca = report;
+    if (!rca && incidentData) {
+      console.log('[EMAIL] No prebuilt report supplied. Generating RCA from incidentData');
+      rca = await analyzeIncident(incidentData);
+      console.log('[EMAIL] RCA generation complete');
+    }
+    if (!rca) {
+      return res.status(400).json({ error: 'Provide `report` (prepared RCA) or `incidentData`' });
+    }
+
+    const html = await generateOutlookHtmlFromRCA(rca);
+    console.log('[EMAIL] HTML generated', { htmlLength: html ? html.length : 0 });
+
+    console.log('[EMAIL] Sending via SendGrid', {
+      toPreview: `${to.substring(0, 3)}***`,
+      subjectPreview: subject.substring(0, 60),
+      htmlLength: html ? html.length : 0
+    });
+    await mailSender(to, subject, html);
+    console.log('[EMAIL] SendGrid send completed');
+
+    res.json({ ok: true, preview: html.slice(0, 500) });
+  } catch (error) {
+    console.error('RCA email send failed:', error);
+    res.status(500).json({ error: 'Failed to send RCA email', details: error.message });
   }
 });
 
