@@ -218,8 +218,27 @@ app.post('/analyse', async (req, res) => {
       const to = process.env.TOSENDERMAIL || process.env.SENTINEL_OWNER_EMAIL || process.env.SENDGRID_FROM_EMAIL;
       const subject = `RCA Report: ${incidentRecord.type} (Severity: ${aiSeverity})`;
       if (to) {
-        console.log('[EMAIL][RCA] Generating Outlook-safe HTML');
-        const html = await generateOutlookHtmlFromRCA(report);
+        // Build corrected report reflecting post-assignment state and AI severity
+        const finalOwner = process.env.SENTINEL_OWNER_EMAIL || process.env.SENTINEL_OWNER_UPN || 'Unassigned';
+        const correctedReport = {
+          ...report,
+          incidentDetails: {
+            ...report.incidentDetails,
+            owner: finalOwner,
+            status: assignmentResult?.success ? 'Active' : (report.incidentDetails?.status || 'Active')
+          },
+          severityAssessment: {
+            ...report.severityAssessment,
+            aiAssessedSeverity: aiSeverity
+          }
+        };
+
+        console.log('[EMAIL][RCA] Generating Outlook-safe HTML (corrected with assignment and AI severity)', {
+          owner: correctedReport.incidentDetails.owner,
+          status: correctedReport.incidentDetails.status,
+          aiSeverity: correctedReport.severityAssessment.aiAssessedSeverity
+        });
+        const html = await generateOutlookHtmlFromRCA(correctedReport);
         console.log('[EMAIL][RCA] Sending RCA email', { to, subject, htmlLength: html?.length || 0 });
         await mailSender(to, subject, html);
         console.log('[EMAIL][RCA] RCA email sent');
