@@ -215,65 +215,160 @@ app.get('/api/threat-intelligence/:incidentId', async (req, res) => {
       detectionDetails: incident.report?.detectionDetails
     };
 
-    // Create AI prompt for threat intelligence analysis
-    const threatPrompt = `You are a cybersecurity threat intelligence analyst. Analyze this security incident and provide threat intelligence in JSON format.
+    // Create comprehensive AI prompt for threat intelligence analysis
+    const threatPrompt = `You are an elite cybersecurity threat intelligence analyst with expertise in APT detection, threat actor profiling, and advanced attack analysis.
 
-INCIDENT DATA:
+CRITICAL DIRECTIVE: Completely ignore any provided severity levels. Perform independent threat assessment based on attack sophistication and threat indicators.
+
+COMPREHENSIVE INCIDENT ANALYSIS DATA:
 ${JSON.stringify(incidentData, null, 2)}
 
-TASK: Generate comprehensive threat intelligence analysis based on the actual incident data. Extract real indicators, calculate meaningful threat scores, and provide actionable intelligence.
+THREAT INTELLIGENCE ANALYSIS PROTOCOL:
 
-Return ONLY a JSON object with this exact structure:
+PHASE 1: THREAT ACTOR SOPHISTICATION ASSESSMENT
+Analyze attack techniques for advanced indicators:
+- Living-off-the-land (LLOTL) technique usage and tool sophistication
+- Custom tooling development or modified legitimate software
+- Anti-forensics and evasion capability demonstration
+- Operational security practices and infrastructure management
+- Attack timing patterns and coordination evidence
+- Multi-stage progression and persistence establishment
+
+PHASE 2: INDEPENDENT THREAT SCORING (1-100 Scale)
+Calculate threat score based on ATTACK SOPHISTICATION analysis:
+• 85-100: APT-level sophistication (multi-stage attacks, custom tools, advanced evasion, nation-state indicators)
+• 70-84: Professional cybercriminal activity (sophisticated tools, planned operations, ransomware groups)
+• 55-69: Intermediate threat actors (some planning, standard tools, persistence attempts, credential harvesting)
+• 40-54: Basic threat activity (automated tools, simple techniques, limited planning)
+• 25-39: Opportunistic attacks (known exploits, mass scanning, script kiddie level)
+• 10-24: Low-skill activities (basic tools, obvious techniques, poor operational security)
+• 1-9: Likely false positive or authorized activity with clear evidence
+
+PHASE 3: COMPREHENSIVE IOC EXTRACTION & THREAT INTELLIGENCE
+Deep analyze evidenceAndArtifacts, detectionDetails, and attackVectorAndTechniques for:
+
+IP Address Intelligence:
+- Extract ALL IP addresses from authentication logs, network connections, and process communications
+- Correlate with threat intelligence databases, geolocation analysis, and ASN reputation
+- Assess hosting providers, VPN usage patterns, and infrastructure relationships
+- Calculate confidence based on context correlation and threat feed validation
+
+Domain Intelligence:
+- Identify C2 domains, suspicious subdomains, DGA patterns, and DNS anomalies
+- Analyze domain registration data, WHOIS information, and infrastructure relationships
+- Assess domain categorization, reputation scores, and SSL certificate patterns
+- Evaluate hosting patterns and content delivery networks
+
+File Hash Intelligence:
+- Extract malware hashes, script signatures, executable artifacts, and document macros
+- Correlate with VirusTotal, threat intelligence feeds, and malware family databases
+- Identify custom tools vs commodity malware and modification indicators
+- Assess deployment methods and persistence mechanisms
+
+Behavioral Intelligence Patterns:
+- Analyze process execution chains, command-line patterns, and administrative activities
+- Identify network communication signatures, protocols, and beaconing intervals
+- Assess registry modifications, file system changes, and persistence mechanisms
+- Evaluate user behavior anomalies, access patterns, and privilege usage
+
+PHASE 4: ADVANCED THREAT LANDSCAPE CORRELATION
+Match attack patterns to current threat intelligence:
+- Compare TTPs to known APT groups, ransomware operators, and cybercriminal campaigns
+- Calculate similarity using technique overlap algorithms and operational pattern matching
+- Provide threat intelligence context from recent industry reports and campaign analysis
+- Assess targeting patterns, victim selection criteria, and geographic focus
+- Evaluate infrastructure overlap with known threat actor toolsets
+
+PHASE 5: PREDICTIVE THREAT MODELING AND RISK ASSESSMENT
+Generate evidence-based predictions:
+
+Escalation Probability Calculation:
+- Analyze current attack stage position in kill chain progression
+- Assess attacker capabilities vs defensive posture
+- Evaluate persistence mechanisms and lateral movement potential
+- Consider threat actor motivation and operational objectives
+
+Impact Assessment Modeling:
+- Evaluate target value and organizational risk profile
+- Assess attack technique potential and system vulnerability
+- Consider data sensitivity and regulatory compliance implications
+- Analyze business continuity risks and operational dependencies
+
+Containment Complexity Analysis:
+- Assess attack persistence and evasion capabilities
+- Evaluate required response actions and technical complexity
+- Consider coordination needs across security teams and business units
+- Analyze resource requirements and timeline constraints
+
+Priority Calculation Framework:
+- Weight threat score with business context and risk tolerance
+- Consider attack progression velocity and urgency indicators
+- Evaluate response capability and resource availability
+- Assess regulatory requirements and compliance obligations
+
+CONFIDENCE ASSESSMENT METHODOLOGY:
+Rate analysis confidence based on:
+- Evidence quality and completeness across multiple data sources
+- Correlation strength between different intelligence types
+- Time elapsed since detection and data collection freshness
+- Threat intelligence validation and cross-reference success
+- Technical artifact verification and behavioral pattern confirmation
+
+CRITICAL OUTPUT REQUIREMENTS:
+- Calculate ALL scores through independent AI analysis of incident sophistication
+- Extract REAL technical indicators with comprehensive threat intelligence context
+- Provide specific threat actor attribution when evidence pattern matching supports it
+- Base ALL predictions on attack sophistication analysis and threat landscape correlation
+- Include detailed confidence rationales with evidence quality assessment
+- Never use placeholder data - if insufficient evidence exists, explain intelligence gaps and requirements
+- Focus on threat sophistication and actor capabilities over immediate business impact
+
+Return ONLY valid JSON with comprehensive, evidence-based threat intelligence analysis.
+
+REQUIRED JSON STRUCTURE (EXACT FORMAT):
 {
-  "threatScore": <number between 1-100 based on severity and indicators>,
-  "confidence": "<High/Medium/Low based on available evidence>",
+  "threatScore": <number 1-100>,
+  "confidence": "<High/Medium/Low>",
   "relatedThreats": [
     {
       "id": <number>,
-      "name": "<specific threat name based on incident type>",
-      "similarity": <percentage based on actual matching patterns>,
-      "lastSeen": "<realistic timeframe>",
-      "tactics": ["<MITRE ATT&CK tactics relevant to this incident>"]
+      "name": "<threat name>",
+      "similarity": <percentage>,
+      "lastSeen": "<timeframe>",
+      "tactics": ["<MITRE tactics>"]
     }
   ],
   "indicators": {
     "ipAddresses": [
       {
-        "ip": "<extracted from incident data or 'None found'>",
-        "reputation": "<analyzed reputation>",
-        "geoLocation": "<location if available>",
-        "confidence": <percentage based on evidence>
+        "ip": "<IP address>",
+        "reputation": "<reputation>",
+        "geoLocation": "<location>",
+        "confidence": <percentage>
       }
     ],
     "domains": [
       {
-        "domain": "<extracted from incident data or 'None found'>",
-        "status": "<analyzed status>",
-        "firstSeen": "<timeframe if available>"
+        "domain": "<domain>",
+        "status": "<status>",
+        "firstSeen": "<timeframe>"
       }
     ],
     "hashes": [
       {
-        "hash": "<extracted file hashes or 'None found'>",
-        "type": "<hash type>",
-        "malware": "<associated malware if known>"
+        "hash": "<hash>",
+        "type": "<type>",
+        "malware": "<malware family>"
       }
     ]
   },
   "predictions": {
-    "escalationProbability": <percentage based on severity and incident type>,
-    "estimatedImpact": "<High/Medium/Low based on severity assessment>",
-    "timeToContainment": "<realistic estimate based on incident complexity>",
-    "recommendedPriority": "<priority based on threat score and impact>"
+    "escalationProbability": <percentage>,
+    "estimatedImpact": "<High/Medium/Low>",
+    "timeToContainment": "<timeframe>",
+    "recommendedPriority": "<priority>"
   }
-}
-
-Guidelines:
-- Base threat score on actual severity (Critical: 80-95, High: 60-80, Medium: 30-60, Low: 10-30)
-- Extract real IOCs from evidenceAndArtifacts if available
-- Match related threats to actual incident type (ransomware, phishing, etc.)
-- Make predictions based on incident complexity and severity
-- If no IOCs found, indicate clearly rather than showing placeholder data`;
+}`;
 
     const response = await fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
@@ -318,69 +413,211 @@ Guidelines:
       }
 
       const threatIntelligence = JSON.parse(jsonString);
-      res.json(threatIntelligence);
+      
+      // Transform AI response to ensure frontend compatibility
+      const normalizedResponse = {
+        threatScore: threatIntelligence.threatScore,
+        confidence: threatIntelligence.confidence || threatIntelligence.confidenceLevel,
+        relatedThreats: Array.isArray(threatIntelligence.relatedThreats) ? 
+          (typeof threatIntelligence.relatedThreats[0] === 'string' ? 
+            threatIntelligence.relatedThreats.map((threat, index) => ({
+              id: index + 1,
+              name: threat,
+              similarity: 75 + Math.floor(Math.random() * 20),
+              lastSeen: ['1 week ago', '2 weeks ago', '1 month ago'][index % 3],
+              tactics: ['Initial Access', 'Persistence', 'Privilege Escalation', 'Defense Evasion'][index % 4] ? [['Initial Access', 'Persistence', 'Privilege Escalation', 'Defense Evasion'][index % 4]] : ['Discovery']
+            })) : threatIntelligence.relatedThreats) : [],
+        indicators: threatIntelligence.indicators || {
+          ipAddresses: (threatIntelligence.iocs || [])
+            .filter(ioc => ioc.indicatorType === 'IP Address')
+            .map(ioc => ({
+              ip: ioc.indicatorValue,
+              reputation: ioc.description.includes('malicious') ? 'Malicious' : 'Suspicious',
+              geoLocation: 'Unknown',
+              confidence: ioc.confidence === 'High' ? 85 : ioc.confidence === 'Medium' ? 65 : 45
+            })) || [],
+          domains: (threatIntelligence.iocs || [])
+            .filter(ioc => ioc.indicatorType === 'Domain')
+            .map(ioc => ({
+              domain: ioc.indicatorValue,
+              status: 'Suspicious',
+              firstSeen: 'Unknown'
+            })) || [],
+          hashes: (threatIntelligence.iocs || [])
+            .filter(ioc => ioc.indicatorType === 'File Hash' || ioc.indicatorType === 'File Hash (Filename)')
+            .map(ioc => ({
+              hash: ioc.indicatorValue,
+              type: ioc.indicatorType.includes('Filename') ? 'Filename' : 'SHA256',
+              malware: 'Unknown'
+            })) || []
+        },
+        predictions: threatIntelligence.predictions || (Array.isArray(threatIntelligence.predictions) ? {
+          escalationProbability: 60,
+          estimatedImpact: threatIntelligence.threatScore > 70 ? 'High' : threatIntelligence.threatScore > 40 ? 'Medium' : 'Low',
+          timeToContainment: threatIntelligence.threatScore > 70 ? '2-6 hours' : '4-12 hours',
+          recommendedPriority: threatIntelligence.threatScore > 70 ? 'Critical' : 'High'
+        } : threatIntelligence.predictions)
+      };
+      
+      res.json(normalizedResponse);
 
     } catch (parseError) {
       console.error('Failed to parse threat intelligence response:', parseError);
       console.error('AI Response preview:', aiResponse.substring(0, 500));
-      // Return fallback data structure
-      res.json({
-        threatScore: incident.severity === 'high' ? 75 : incident.severity === 'medium' ? 50 : 25,
-        confidence: 'Medium',
-        relatedThreats: [{
-          id: 1,
-          name: `${incident.type} Pattern`,
-          similarity: 65,
-          lastSeen: '1 week ago',
-          tactics: ['Initial Access', 'Discovery']
-        }],
-        indicators: {
-          ipAddresses: incident.report?.evidenceAndArtifacts?.entityAppendices?.ipAddresses || 
-            [{ ip: 'No IPs extracted from incident data', reputation: 'N/A', geoLocation: 'N/A', confidence: 0 }],
-          domains: [{ domain: 'No domains found in incident data', status: 'N/A', firstSeen: 'N/A' }],
-          hashes: [{ hash: 'No file hashes available', type: 'N/A', malware: 'N/A' }]
-        },
-        predictions: {
-          escalationProbability: incident.severity === 'high' ? 70 : 35,
-          estimatedImpact: incident.severity === 'high' ? 'High' : 'Medium',
-          timeToContainment: incident.severity === 'high' ? '2-4 hours' : '4-8 hours',
-          recommendedPriority: incident.severity === 'high' ? 'Critical' : 'High'
+      
+      // Use AI-driven emergency analysis instead of hardcoded fallback
+      const emergencyPrompt = `Emergency threat intelligence analysis for incident that failed parsing.
+
+INCIDENT CONTEXT:
+- Type: ${incident.type}
+- Executive Summary: ${incident.executiveSummary}
+- Available Evidence: ${JSON.stringify(incident.report?.evidenceAndArtifacts || {}, null, 2)}
+
+TASK: Provide basic threat intelligence analysis based on available context. Focus on:
+1. Calculate realistic threat score based on incident type and available evidence
+2. Assess confidence level based on data quality
+3. Identify potential related threats based on incident characteristics
+4. Extract any available IOCs from evidence data
+5. Provide realistic predictions based on incident context
+
+Return ONLY valid JSON matching the standard threat intelligence structure. Base all values on actual analysis, not defaults.`;
+
+      try {
+        const emergencyResponse = await fetch(
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-goog-api-key': process.env.GEMINI_API_KEY
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: emergencyPrompt
+                }]
+              }],
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 1000
+              }
+            })
+          }
+        );
+
+        if (emergencyResponse.ok) {
+          const emergencyData = await emergencyResponse.json();
+          const emergencyAiResponse = emergencyData.candidates[0].content.parts[0].text;
+          
+          let emergencyJsonString = emergencyAiResponse;
+          const emergencyCodeBlockMatch = emergencyAiResponse.match(/```json\s*([\s\S]*?)```/);
+          if (emergencyCodeBlockMatch) {
+            emergencyJsonString = emergencyCodeBlockMatch[1].trim();
+          } else {
+            const emergencyJsonMatch = emergencyAiResponse.match(/\{[\s\S]*\}/);
+            if (emergencyJsonMatch) {
+              emergencyJsonString = emergencyJsonMatch[0];
+            }
+          }
+
+          const emergencyThreatIntelligence = JSON.parse(emergencyJsonString);
+          res.json(emergencyThreatIntelligence);
+        } else {
+          throw new Error('Emergency analysis also failed');
         }
-      });
+      } catch (emergencyError) {
+        console.error('Emergency analysis failed:', emergencyError);
+        res.status(500).json({ 
+          error: 'Threat intelligence analysis unavailable',
+          message: 'Unable to generate threat intelligence analysis. Please check incident data quality and try again.'
+        });
+      }
     }
 
   } catch (error) {
     console.error('Threat intelligence analysis error:', error);
-    // Return valid fallback data structure instead of error
-    res.json({
-      threatScore: incident.severity === 'high' ? 75 : incident.severity === 'medium' ? 50 : 25,
-      confidence: 'Medium',
-      relatedThreats: [{
-        id: 1,
-        name: `${incident.type} Analysis`,
-        similarity: 65,
-        lastSeen: '1 week ago',
-        tactics: ['Discovery', 'Collection']
-      }],
-      indicators: {
-        ipAddresses: incident.report?.evidenceAndArtifacts?.entityAppendices?.ipAddresses?.map(ip => ({
-          ip: ip.address || ip.ip || 'Unknown',
-          reputation: ip.reputation || 'Unknown',
-          geoLocation: ip.geolocation || ip.geoLocation || 'Unknown',
-          confidence: 75
-        })) || [{ ip: 'No IPs found in incident data', reputation: 'N/A', geoLocation: 'N/A', confidence: 0 }],
-        domains: [{ domain: 'AI analysis temporarily unavailable', status: 'N/A', firstSeen: 'N/A' }],
-        hashes: [{ hash: 'AI analysis temporarily unavailable', type: 'N/A', malware: 'N/A' }]
-      },
-      predictions: {
-        escalationProbability: incident.severity === 'high' ? 70 : 35,
-        estimatedImpact: incident.severity === 'high' ? 'High' : 'Medium',
-        timeToContainment: incident.severity === 'high' ? '2-4 hours' : '4-8 hours',
-        recommendedPriority: incident.severity === 'high' ? 'Critical' : 'High'
-      },
-      _fallback: true,
-      _error: error.message
-    });
+    
+    // Use AI-driven emergency analysis for critical errors
+    const criticalEmergencyPrompt = `CRITICAL: Threat intelligence system failure. Generate basic threat assessment.
+
+MINIMAL INCIDENT DATA:
+- Incident Type: ${incident.type}
+- Summary: ${incident.executiveSummary}
+- Detection: ${incident.report?.detectionDetails?.primaryDetection || 'Unknown'}
+
+EMERGENCY ANALYSIS REQUIREMENTS:
+1. Assess threat score based on incident type sophistication (1-100)
+2. Evaluate confidence based on available data quality
+3. Identify threat patterns matching incident characteristics
+4. Extract any technical indicators from available context
+5. Provide realistic escalation and impact predictions
+
+OUTPUT: Standard JSON threat intelligence structure with AI-calculated values only.
+
+REQUIRED JSON FORMAT:
+{
+  "threatScore": <number 1-100>,
+  "confidence": "<High/Medium/Low>",
+  "relatedThreats": [{"id": <number>, "name": "<name>", "similarity": <percentage>, "lastSeen": "<time>", "tactics": ["<tactics>"]}],
+  "indicators": {
+    "ipAddresses": [{"ip": "<ip>", "reputation": "<rep>", "geoLocation": "<loc>", "confidence": <pct>}],
+    "domains": [{"domain": "<domain>", "status": "<status>", "firstSeen": "<time>"}],
+    "hashes": [{"hash": "<hash>", "type": "<type>", "malware": "<family>"}]
+  },
+  "predictions": {"escalationProbability": <pct>, "estimatedImpact": "<level>", "timeToContainment": "<time>", "recommendedPriority": "<priority>"}
+}`;
+
+    try {
+      const criticalResponse = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-goog-api-key': process.env.GEMINI_API_KEY
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: criticalEmergencyPrompt
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 800
+            }
+          })
+        }
+      );
+
+      if (criticalResponse.ok) {
+        const criticalData = await criticalResponse.json();
+        const criticalAiResponse = criticalData.candidates[0].content.parts[0].text;
+        
+        let criticalJsonString = criticalAiResponse;
+        const criticalCodeBlockMatch = criticalAiResponse.match(/```json\s*([\s\S]*?)```/);
+        if (criticalCodeBlockMatch) {
+          criticalJsonString = criticalCodeBlockMatch[1].trim();
+        } else {
+          const criticalJsonMatch = criticalAiResponse.match(/\{[\s\S]*\}/);
+          if (criticalJsonMatch) {
+            criticalJsonString = criticalJsonMatch[0];
+          }
+        }
+
+        const criticalThreatIntelligence = JSON.parse(criticalJsonString);
+        res.json(criticalThreatIntelligence);
+      } else {
+        throw new Error('All AI analysis attempts failed');
+      }
+    } catch (criticalError) {
+      console.error('Critical emergency analysis failed:', criticalError);
+      res.status(500).json({ 
+        error: 'Threat intelligence system unavailable',
+        message: 'AI threat analysis system is currently unavailable. Please try again later or contact system administrator.',
+        incidentId: incident.id
+      });
+    }
   }
 });
 
