@@ -95,6 +95,7 @@ function ReportDisplay({ report }) {
   const preferredOrder = [
     'executiveSummary',
     'severityAssessment',
+    'sentinelAssignment',
     'incidentDetails',
     'timelineOfEvents',
     'detectionDetails',
@@ -174,6 +175,41 @@ function ReportDisplay({ report }) {
                   <strong>Assessment Rationale:</strong> {value.justification}
                 </div>
               )}
+            </div>
+          );
+        }
+
+        if (key === 'sentinelAssignment' && value) {
+          return (
+            <div key={key} className="report-block sentinel-assignment-status">
+              <h3>🔐 Sentinel Auto-Assignment</h3>
+              <div className={`assignment-result ${value.success ? 'success' : 'error'}`}>
+                {value.success ? (
+                  <>
+                    <div className="status-icon">✅</div>
+                    <div className="assignment-details">
+                      <p><strong>Status:</strong> Successfully assigned</p>
+                      <p><strong>Assigned to:</strong> {value.assignedTo}</p>
+                      <p><strong>Severity updated to:</strong> {value.severity}</p>
+                      <p><strong>Incident ID:</strong> {value.incidentId}</p>
+                      <p><strong>Timestamp:</strong> {new Date(value.timestamp).toLocaleString()}</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="status-icon">❌</div>
+                    <div className="assignment-details">
+                      <p><strong>Status:</strong> Assignment failed</p>
+                      <p><strong>Error:</strong> {value.error}</p>
+                      {value.status === 404 && (
+                        <p className="error-hint">
+                          ⚠️ Incident not found in Sentinel. Verify the incident ID.
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           );
         }

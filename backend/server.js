@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { analyzeIncident } from './services/geminiService.js';
+import { updateSentinelIncident, validateSentinelConnection } from './services/sentinelService.js';
 
 dotenv.config();
 
@@ -113,14 +114,26 @@ app.post('/analyse', async (req, res) => {
     const incidentData = req.body;
     const report = await analyzeIncident(incidentData);
     
+    // Extract AI-assessed severity from the report
+    const aiSeverity = report.severityAssessment?.aiAssessedSeverity || 
+                      report.severityAssessment?.initialSeverity || 
+                      'medium'; // Safe fallback
+    
+    console.log('RCA Analysis completed:', {
+      incidentType: extractIncidentType(report),
+      initialSeverity: report.severityAssessment?.initialSeverity,
+      aiAssessedSeverity: aiSeverity,
+      severityChanged: report.severityAssessment?.initialSeverity !== aiSeverity
+    });
+    
     // Store the incident with metadata
     const incidentRecord = {
       id: Date.now().toString(),
       timestamp: new Date(),
       originalData: incidentData,
       report: report,
-      severity: report.severityAssessment?.aiAssessedSeverity || report.severityAssessment?.initialSeverity || 'UNKNOWN',
-      status: report?.incidentDetails?.status || 'UNKNOWN',
+      severity: aiSeverity, // Using AI-assessed severity
+      status: report?.incidentDetails?.status || 'Active',
       type: extractIncidentType(report),
       executiveSummary: report.executiveSummary,
       affectedUsers: extractAffectedUsers(report),
@@ -129,10 +142,111 @@ app.post('/analyse', async (req, res) => {
     
     incidents.unshift(incidentRecord); // Add to beginning of array
     
-    res.json(report);
+    // Auto-assign incident in Sentinel if configuration is available
+    let assignmentResult = null;
+    const sentinelEnabled = process.env.AZURE_CLIENT_ID && 
+                          process.env.AZURE_CLIENT_SECRET && 
+                          process.env.AZURE_SUBSCRIPTION_ID;
+    
+    if (sentinelEnabled) {
+      // Extract incident ID from various possible locations
+      const incidentArmId = incidentData.object?.id || 
+                           incidentData.id || 
+                           incidentData.properties?.id ||
+                           incidentData.name;
+      
+      if (incidentArmId) {
+        const DEBUG = process.env.SENTINEL_DEBUG === 'true';
+        console.log('🚀 Attempting Sentinel auto-assignment');
+        
+        if (DEBUG) {
+          console.log('Sentinel update request details:', {
+            armId: incidentArmId,
+            aiSeverity: aiSeverity,
+            assignTo: process.env.SENTINEL_OWNER_EMAIL,
+            initialSeverity: report.severityAssessment?.initialSeverity,
+            severityConfidence: report.severityAssessment?.confidence,
+            incidentType: incidentRecord.type,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        const sentinelStartTime = Date.now();
+        
+        // Pass AI-assessed severity to Sentinel update
+        assignmentResult = await updateSentinelIncident(
+          incidentArmId,
+          aiSeverity, // Using AI severity, not hardcoded
+          {
+            description: `RCA completed by SOC Automation Agent. 
+AI-Assessed Severity: ${aiSeverity} (Initial: ${report.severityAssessment?.initialSeverity})
+Type: ${incidentRecord.type}
+Executive Summary: ${incidentRecord.executiveSummary?.substring(0, 500)}...
+Analysis Timestamp: ${new Date().toISOString()}`
+          }
+        );
+        
+        const sentinelDuration = Date.now() - sentinelStartTime;
+        
+        // Store assignment result
+        incidentRecord.sentinelAssignment = assignmentResult;
+        
+        if (assignmentResult.success) {
+          console.log(`✅ Sentinel assignment successful (${sentinelDuration}ms)`);
+          
+          if (DEBUG) {
+            console.log('Sentinel assignment details:', {
+              incidentId: assignmentResult.incidentId,
+              severity: assignmentResult.severity,
+              assignedTo: assignmentResult.assignedTo,
+              requestDuration: assignmentResult.requestDuration,
+              totalDuration: sentinelDuration,
+              etag: assignmentResult.response?.etag
+            });
+          }
+        } else {
+          console.error(`❌ Sentinel assignment failed (${sentinelDuration}ms)`);
+          
+          if (DEBUG) {
+            console.error('Sentinel failure details:', {
+              error: assignmentResult.error,
+              status: assignmentResult.status,
+              incidentId: assignmentResult.incidentId,
+              attemptDuration: sentinelDuration
+            });
+          }
+        }
+      } else {
+        console.log('No incident ID found in request, skipping Sentinel assignment');
+        console.log('Available paths checked:', {
+          'object.id': incidentData.object?.id,
+          'id': incidentData.id,
+          'properties.id': incidentData.properties?.id,
+          'name': incidentData.name
+        });
+      }
+    } else {
+      console.log('Sentinel integration not fully configured');
+      const missingConfigs = [];
+      if (!process.env.AZURE_CLIENT_ID) missingConfigs.push('AZURE_CLIENT_ID');
+      if (!process.env.AZURE_CLIENT_SECRET) missingConfigs.push('AZURE_CLIENT_SECRET');
+      if (!process.env.AZURE_SUBSCRIPTION_ID) missingConfigs.push('AZURE_SUBSCRIPTION_ID');
+      console.log('Missing configurations:', missingConfigs);
+    }
+    
+    // Add assignment result to response
+    const response = {
+      ...report,
+      sentinelAssignment: assignmentResult
+    };
+    
+    res.json(response);
   } catch (error) {
     console.error('Analysis error:', error);
-    res.status(500).json({ error: 'Failed to analyze incident' });
+    res.status(500).json({ 
+      error: 'Failed to analyze incident', 
+      details: error.message 
+    });
   }
 });
 
@@ -709,6 +823,50 @@ Response:`;
     res.status(500).json({ 
       error: 'Failed to get AI response',
       response: 'I apologize, but I encountered an error processing your request. Please try again or check the incident details directly.'
+    });
+  }
+});
+
+// Health check endpoint to verify Sentinel connectivity
+app.get('/sentinel/health', async (req, res) => {
+  const DEBUG = process.env.SENTINEL_DEBUG === 'true';
+  const startTime = Date.now();
+  
+  try {
+    if (DEBUG) {
+      console.log('🏥 Sentinel health check requested');
+    }
+    
+    const status = await validateSentinelConnection();
+    const duration = Date.now() - startTime;
+    
+    if (DEBUG) {
+      console.log(`✅ Sentinel health check completed (${duration}ms)`, {
+        connected: status.connected,
+        hasToken: status.hasToken,
+        workspace: status.configuration?.workspace,
+        assignee: status.configuration?.assignee
+      });
+    }
+    
+    res.json({
+      ...status,
+      checkDuration: duration
+    });
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    
+    if (DEBUG) {
+      console.error(`❌ Sentinel health check failed (${duration}ms)`, {
+        error: error.message,
+        stack: error.stack
+      });
+    }
+    
+    res.status(500).json({ 
+      connected: false, 
+      error: error.message,
+      checkDuration: duration
     });
   }
 });

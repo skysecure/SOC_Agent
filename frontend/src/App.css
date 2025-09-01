@@ -20,6 +20,49 @@
   to { transform: rotate(360deg); }
 }
 
+/* Sentinel Assignment Status */
+.sentinel-assignment-status {
+  margin-top: 20px;
+  padding: 15px;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+}
+
+.assignment-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 6px;
+  margin-top: 10px;
+}
+
+.assignment-result.success {
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
+}
+
+.assignment-result.error {
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+}
+
+.status-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.assignment-details p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.error-hint {
+  font-style: italic;
+  color: #856404;
+  margin-top: 8px;
+}
+
 /* Loading States */
 .loading-spinner {
   border: 3px solid #f3f3f3;

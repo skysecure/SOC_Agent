@@ -128,7 +128,7 @@ RCA Response Format (Mandatory Structure - DETAILED VERSION)
    - **Incident ID**: [Unique identifier from source system]
    - **Owner/Analyst**: [Assigned analyst or team]
    - **Opened (UTC)**: [createdTimeUtc - exact timestamp]
-   - **Status**: [Open/In Progress/Contained/Closed]
+   - **Status**: [New/Active/Closed]
    - **Detection Source**: [SIEM/EDR/IDS/Manual/Other]
    - **Analytics Rule Name**: [If triggered by automated rule]
    - **Environment/Tenant**: [Production/Dev/Test, Tenant ID if applicable]
