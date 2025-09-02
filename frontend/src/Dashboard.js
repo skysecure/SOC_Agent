@@ -453,7 +453,6 @@ function Dashboard() {
     informational: incidents.filter(i => i.severity?.toLowerCase() === 'informational').length,
     closed: incidents.filter(i => i.status === 'Closed').length,
     active: incidents.filter(i => i.status === 'Active').length,
-    new: incidents.filter(i => i.status === 'New').length,
     avgResponseTime: incidents.length > 0 
       ? Math.round(incidents.reduce((sum, i) => sum + (i.responseTime || 0), 0) / incidents.length)
       : 0
@@ -469,8 +468,7 @@ function Dashboard() {
 
   const statusData = [
     { name: 'Closed', value: metrics.closed, color: '#4caf50' },
-    { name: 'Active', value: metrics.active, color: '#ff9800' },
-    { name: 'New', value: metrics.new, color: '#f44336' }
+    { name: 'Active', value: metrics.active, color: '#ff9800' }
   ];
 
   // Group incidents by date for trend chart
@@ -498,17 +496,53 @@ function Dashboard() {
   const getStatusClass = (status) => {
     if (status === 'closed') return 'status-closed';
     if (status === 'active') return 'status-active';
-    return 'status-new';
+    return 'status-active'; // Default to active for any other status
   };
 
   const formatAffectedUsers = (users) => {
     if (!users) return 'N/A';
+    
+    // Handle array of user objects (new format)
     if (Array.isArray(users)) {
-      return users.join(', ');
+      if (users.length === 0) return 'None';
+      
+      // Check if it's an array of user objects with displayName/upn
+      if (users[0] && typeof users[0] === 'object' && (users[0].displayName || users[0].upn)) {
+        return users.map(user => {
+          // Prefer displayName, fallback to upn, then other fields
+          if (user.displayName) return user.displayName;
+          if (user.upn) return user.upn;
+          if (user.name) return user.name;
+          if (user.email) return user.email;
+          if (user.id) return user.id;
+          return 'Unknown User';
+        }).join(', ');
+      }
+      
+      // Handle array of primitive values (old format)
+      if (users.every(item => typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean')) {
+        return users.join(', ');
+      }
+      
+      // Handle array of objects with unknown structure
+      return users.map(user => {
+        if (typeof user === 'string') return user;
+        if (typeof user === 'number') return user.toString();
+        if (typeof user === 'boolean') return user.toString();
+        if (typeof user === 'object' && user !== null) {
+          // Try to extract meaningful information from object
+          return user.displayName || user.upn || user.name || user.email || user.id || 'Unknown User';
+        }
+        return 'Unknown User';
+      }).join(', ');
     }
+    
+    // Handle single user object
     if (typeof users === 'object' && users !== null && !Array.isArray(users)) {
-      return Object.values(users).join(', ');
+      return users.displayName || users.upn || users.name || users.email || users.id || 'Unknown User';
     }
+    
+    // Handle primitive values
     return String(users);
   };
 
