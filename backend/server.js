@@ -64,24 +64,64 @@ function extractAffectedUsers(report) {
   // Check multiple possible locations for affected users
   const users = [];
   
+  // Helper function to normalize user data
+  const normalizeUser = (user) => {
+    if (typeof user === 'string') return user;
+    if (typeof user === 'object' && user !== null) {
+      // Handle new user object format
+      if (user.displayName && user.upn) {
+        return {
+          displayName: user.displayName,
+          upn: user.upn,
+          aadUserId: user.aadUserId || user.id,
+          role: user.role || 'User',
+          department: user.department
+        };
+      }
+      // Handle legacy format
+      return user;
+    }
+    return user;
+  };
+  
+  // Extract from various locations and normalize
   if (report.fullRCAReport?.incidentOverview?.affectedUPNUsers) {
-    users.push(...report.fullRCAReport.incidentOverview.affectedUPNUsers);
+    const normalizedUsers = Array.isArray(report.fullRCAReport.incidentOverview.affectedUPNUsers) 
+      ? report.fullRCAReport.incidentOverview.affectedUPNUsers.map(normalizeUser)
+      : [normalizeUser(report.fullRCAReport.incidentOverview.affectedUPNUsers)];
+    users.push(...normalizedUsers);
   }
   
   if (report.fullRCAReport?.incidentOverview?.['affectedUPN/Users']) {
-    users.push(...report.fullRCAReport.incidentOverview['affectedUPN/Users']);
+    const normalizedUsers = Array.isArray(report.fullRCAReport.incidentOverview['affectedUPN/Users'])
+      ? report.fullRCAReport.incidentOverview['affectedUPN/Users'].map(normalizeUser)
+      : [normalizeUser(report.fullRCAReport.incidentOverview['affectedUPN/Users'])];
+    users.push(...normalizedUsers);
   }
   
   if (report.incidentDetails?.affectedUsers && Array.isArray(report.incidentDetails.affectedUsers)) {
-    users.push(...report.incidentDetails.affectedUsers);
+    const normalizedUsers = report.incidentDetails.affectedUsers.map(normalizeUser);
+    users.push(...normalizedUsers);
   }
   
   if (report.affectedUsers && Array.isArray(report.affectedUsers)) {
-    users.push(...report.affectedUsers);
+    const normalizedUsers = report.affectedUsers.map(normalizeUser);
+    users.push(...normalizedUsers);
   }
   
-  // Remove duplicates
-  return [...new Set(users)];
+  // Remove duplicates based on upn or displayName
+  const uniqueUsers = [];
+  const seenUsers = new Set();
+  
+  users.forEach(user => {
+    const key = user.upn || user.displayName || user.email || user.id || JSON.stringify(user);
+    if (!seenUsers.has(key)) {
+      seenUsers.add(key);
+      uniqueUsers.push(user);
+    }
+  });
+  
+  return uniqueUsers;
 }
 
 // Helper function to calculate response time
@@ -306,7 +346,7 @@ app.post('/analyse', async (req, res) => {
       originalData: incidentData,
       report: report,
       severity: aiSeverity, // Using AI-assessed severity
-      status: report?.incidentDetails?.status || 'Active',
+      status: 'Active', // All new incidents are active by default
       type: extractIncidentType(report),
       executiveSummary: report.executiveSummary,
       affectedUsers: extractAffectedUsers(report),
@@ -381,7 +421,7 @@ app.post('/analyse', async (req, res) => {
           incidentDetails: {
             ...report.incidentDetails,
             owner: finalOwner,
-            status: assignmentResult?.success ? 'Active' : (report.incidentDetails?.status || 'Active')
+            status: 'Active' // All incidents remain active after assignment
           },
           severityAssessment: {
             ...report.severityAssessment,
