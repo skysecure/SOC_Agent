@@ -113,8 +113,8 @@ function calculateResponseTime(incidentData) {
 
 app.post('/analyse', async (req, res) => {
   try {
-    const incidentData = req.body;
-
+    const incidentData = (req?.body?.body?.object) ? req.body?.body?.object : req.body;
+console.log('[ANALYSE] Incident data', incidentData);
     // Acknowledgement email to TOSENDERMAIL
     try {
       const ackTo = process.env.TOSENDERMAIL || process.env.SENTINEL_OWNER_EMAIL || process.env.SENDGRID_FROM_EMAIL;
@@ -175,11 +175,8 @@ app.post('/analyse', async (req, res) => {
                           process.env.AZURE_SUBSCRIPTION_ID;
     
     if (sentinelEnabled) {
-      // Extract incident ID from various possible locations
-      const incidentArmId = incidentData.object?.id || 
-                           incidentData.id || 
-                           incidentData.properties?.id ||
-                           incidentData.name;
+
+      const incidentArmId = incidentData.name;
       
       if (incidentArmId) {
         const DEBUG = process.env.SENTINEL_DEBUG === 'true';
