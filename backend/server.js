@@ -5,6 +5,7 @@ import { analyzeIncident } from './services/geminiService.js';
 import { updateSentinelIncident, validateSentinelConnection } from './services/sentinelService.js';
 import { generateOutlookHtmlFromRCA } from './services/emailTemplateService.js';
 import { mailSender } from './services/mailService.js';
+import { callAI } from './services/aiService.js';
 
 dotenv.config();
 
@@ -162,7 +163,8 @@ console.log('[ANALYSE] Incident data', incidentData);
       type: extractIncidentType(report),
       executiveSummary: report.executiveSummary,
       affectedUsers: extractAffectedUsers(report),
-      responseTime: calculateResponseTime(incidentData)
+      responseTime: calculateResponseTime(incidentData),
+      incidentNumber: incidentData?.properties?.incidentNumber || incidentData?.properties?.providerIncidentId || null
     };
     
     incidents.unshift(incidentRecord); // Add to beginning of array
@@ -276,6 +278,7 @@ app.get('/incidents', async (req, res) => {
       executiveSummary: inc.executiveSummary,
       affectedUsers: inc.affectedUsers,
       responseTime: inc.responseTime,
+      incidentNumber: inc.incidentNumber,
       // Include severity assessment data for the dashboard
       severityAssessment: inc.report?.severityAssessment || null
     }));
@@ -779,9 +782,8 @@ Severity Distribution:
       `${msg.type === 'user' ? 'User' : 'Assistant'}: ${msg.text}`
     ).join('\n');
 
-    const prompt = `You are an AI Security Assistant ${chatMode === 'incident' ? 'focusing on a specific incident' : 'providing general security analysis'}. Use the provided data to give accurate, specific responses.
-
-${incidentContext}
+    // Build the full incident context for the chat assistant
+    const fullIncidentContext = `${incidentContext}
 
 ${dbContext}
 
@@ -799,35 +801,15 @@ Instructions:
 6. Use security best practices in your advice
 
 Response:`;
-
-    const response = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-goog-api-key': process.env.GEMINI_API_KEY
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 500
-          }
-        })
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const aiResponse = data.candidates[0].content.parts[0].text;
+    
+    // Use provider-agnostic AI service
+    const aiResponse = await callAI('CHAT_ASSISTANT', {
+      chatMode,
+      incidentContext: fullIncidentContext
+    }, {
+      temperature: 0.7,
+      maxTokens: 500
+    });
 
     res.json({ response: aiResponse });
   } catch (error) {

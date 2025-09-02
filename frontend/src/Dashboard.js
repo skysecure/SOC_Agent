@@ -642,6 +642,7 @@ function Dashboard() {
               <thead>
                 <tr>
                   <th>Time</th>
+                  <th>Incident #</th>
                   <th>Type</th>
                   <th>Severity</th>
                   <th>Status</th>
@@ -662,6 +663,7 @@ function Dashboard() {
                     }}
                   >
                     <td>{format(new Date(incident.timestamp), 'MMM dd, HH:mm')}</td>
+                    <td className="incident-number-cell">{incident.incidentNumber || 'N/A'}</td>
                     <td>{incident.type}</td>
                     <td>
                       <div style={{display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start'}}>
