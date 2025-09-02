@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 import { analyzeIncident } from './services/geminiService.js';
 import { updateSentinelIncident, validateSentinelConnection } from './services/sentinelService.js';
 import { generateOutlookHtmlFromRCA } from './services/emailTemplateService.js';
@@ -114,8 +115,111 @@ function calculateResponseTime(incidentData) {
 
 app.post('/analyse', async (req, res) => {
   try {
+    // ===== COMPREHENSIVE LOGGING START =====
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    console.log('\n' + '='.repeat(80));
+    console.log(`🚀 [ANALYSE] NEW REQUEST STARTED - ${requestId}`);
+    console.log(`⏰ Timestamp: ${new Date().toISOString()}`);
+    console.log(`🔍 Request Headers:`, JSON.stringify(req.headers, null, 2));
+    console.log(`📊 Request Body Size: ${JSON.stringify(req.body).length} characters`);
+    console.log(`🌐 Remote IP: ${req.ip || req.connection.remoteAddress || 'unknown'}`);
+    console.log(`👤 User Agent: ${req.headers['user-agent'] || 'unknown'}`);
+    console.log('='.repeat(80));
+    
     const incidentData = (req?.body?.body?.object) ? req.body?.body?.object : req.body;
-console.log('[ANALYSE] Incident data', incidentData);
+    
+    // Extract unique identifiers for deduplication tracking
+    const incidentIdentifiers = {
+      requestId: requestId,
+      timestamp: new Date().toISOString(),
+      // Try multiple possible incident ID locations
+      incidentId: incidentData?.id || incidentData?.properties?.id || incidentData?.name || incidentData?.properties?.incidentNumber || incidentData?.properties?.providerIncidentId || 'unknown',
+      title: incidentData?.properties?.title || incidentData?.properties?.alertDisplayName || 'unknown',
+      createdTime: incidentData?.properties?.createdTimeUtc || incidentData?.createdTimeUtc || 'unknown',
+      // Hash the incident data for duplicate detection
+      dataHash: crypto.createHash('md5').update(JSON.stringify(incidentData)).digest('hex').substr(0, 8),
+      // Logic App specific identifiers for better deduplication
+      logicApp: {
+        workflowId: req.headers['x-ms-workflow-id'] || 'unknown',
+        workflowRunId: req.headers['x-ms-workflow-run-id'] || 'unknown',
+        workflowName: req.headers['x-ms-workflow-name'] || 'unknown',
+        trackingId: req.headers['x-ms-tracking-id'] || 'unknown',
+        correlationId: req.headers['x-ms-correlation-id'] || 'unknown'
+      }
+    };
+    
+    console.log(`🔍 [ANALYSE] Incident Identifiers:`, incidentIdentifiers);
+    console.log(`📝 [ANALYSE] Incident Data Preview:`, {
+      hasBody: !!req.body?.body,
+      hasObject: !!req.body?.body?.object,
+      dataType: typeof incidentData,
+      dataKeys: incidentData ? Object.keys(incidentData) : 'null',
+      title: incidentIdentifiers.title,
+      createdTime: incidentIdentifiers.createdTime
+    });
+    
+    // Check for potential duplicate requests (multiple detection methods)
+    const existingIncident = incidents.find(inc => {
+      // Method 1: Check incident ID
+      const idMatch = inc.originalData?.id === incidentIdentifiers.incidentId ||
+                     inc.originalData?.properties?.id === incidentIdentifiers.incidentId ||
+                     inc.originalData?.name === incidentIdentifiers.incidentId;
+      
+      // Method 2: Check Logic App workflow run (most reliable for Logic Apps)
+      const logicAppMatch = inc.emailTracking?.logicApp?.workflowRunId === incidentIdentifiers.logicApp.workflowRunId &&
+                           inc.emailTracking?.logicApp?.workflowRunId !== 'unknown';
+      
+      // Method 3: Check data hash (content-based deduplication)
+      const hashMatch = inc.emailTracking?.dataHash === incidentIdentifiers.dataHash &&
+                       inc.emailTracking?.dataHash !== 'unknown';
+      
+      return idMatch || logicAppMatch || hashMatch;
+    });
+    
+    if (existingIncident) {
+      console.log(`🚨 [ANALYSE] DUPLICATE REQUEST BLOCKED!`, {
+        requestId: requestId,
+        existingIncidentId: existingIncident.id,
+        existingTimestamp: existingIncident.timestamp,
+        timeDifference: Date.now() - existingIncident.timestamp.getTime(),
+        duplicateReason: 'Same incident ID found in memory',
+        action: 'Returning existing incident data without processing'
+      });
+      
+      // Return existing incident data to prevent duplicate processing
+      const response = {
+        ...existingIncident.report,
+        sentinelAssignment: existingIncident.sentinelAssignment,
+        emailTracking: existingIncident.emailTracking || 'No tracking data',
+        requestId: requestId,
+        duplicateBlocked: true,
+        originalRequestId: existingIncident.id,
+        message: 'Duplicate request blocked - incident already processed'
+      };
+      
+      return res.json(response);
+    } else {
+      console.log(`✅ [ANALYSE] No duplicate incidents found - proceeding with analysis`);
+    }
+    
+    // ===== EMAIL TRACKING START =====
+    const emailTracker = {
+      requestId: requestId,
+      incidentId: incidentIdentifiers.incidentId,
+      dataHash: incidentIdentifiers.dataHash,
+      logicApp: incidentIdentifiers.logicApp,
+      acknowledgementSent: false,
+      rcaReportSent: false,
+      totalEmailsSent: 0,
+      emailRecipients: [],
+      emailTimestamps: [],
+      emailErrors: []
+    };
+    
+    console.log(`📧 [EMAIL][TRACKING] Email tracking initialized for request ${requestId}`);
+    
     // Acknowledgement email to TOSENDERMAIL
     try {
       const ackTo = process.env.TOSENDERMAIL || process.env.SENTINEL_OWNER_EMAIL || process.env.SENDGRID_FROM_EMAIL;
@@ -124,16 +228,59 @@ console.log('[ANALYSE] Incident data', incidentData);
         `<p>We have noted the incident and it is currently under investigation.</p>`+
         `<p>Incident title: ${incidentData?.properties?.title || incidentData?.properties?.alertDisplayName || 'Security Incident'}</p>`+
         `<p>Timestamp (UTC): ${incidentData?.properties?.createdTimeUtc || incidentData?.createdTimeUtc || new Date().toISOString()}</p>`+
+        `<p>Request ID: ${requestId}</p>`+
+        `<p>Incident ID: ${incidentIdentifiers.incidentId}</p>`+
       `</div>`;
+      
+      console.log(`📧 [EMAIL][ACK] Preparing acknowledgement email for request ${requestId}`, {
+        recipient: ackTo,
+        subject: ackSubject,
+        htmlLength: ackHtml.length,
+        incidentId: incidentIdentifiers.incidentId,
+        requestId: requestId
+      });
+      
       if (ackTo) {
-        console.log('[EMAIL][ACK] Sending acknowledgement', { to: ackTo, subject: ackSubject });
+        console.log(`📧 [EMAIL][ACK] Sending acknowledgement email for request ${requestId}`, { 
+          to: ackTo, 
+          subject: ackSubject,
+          incidentId: incidentIdentifiers.incidentId,
+          requestId: requestId,
+          timestamp: new Date().toISOString()
+        });
+        
         await mailSender(ackTo, ackSubject, ackHtml);
-        console.log('[EMAIL][ACK] Acknowledgement sent');
+        
+        emailTracker.acknowledgementSent = true;
+        emailTracker.totalEmailsSent++;
+        emailTracker.emailRecipients.push(ackTo);
+        emailTracker.emailTimestamps.push(new Date().toISOString());
+        
+        console.log(`✅ [EMAIL][ACK] Acknowledgement email sent successfully for request ${requestId}`, {
+          recipient: ackTo,
+          totalEmailsSent: emailTracker.totalEmailsSent,
+          timestamp: new Date().toISOString()
+        });
       } else {
-        console.log('[EMAIL][ACK] Skipped (no TOSENDERMAIL/SENTINEL_OWNER_EMAIL/SENDGRID_FROM_EMAIL configured)');
+        console.log(`⚠️  [EMAIL][ACK] Skipped for request ${requestId} - no email recipients configured`, {
+          envVars: {
+            TOSENDERMAIL: !!process.env.TOSENDERMAIL,
+            SENTINEL_OWNER_EMAIL: !!process.env.SENTINEL_OWNER_EMAIL,
+            SENDGRID_FROM_EMAIL: !!process.env.SENDGRID_FROM_EMAIL
+          }
+        });
       }
     } catch (ackError) {
-      console.error('[EMAIL][ACK] Failed to send acknowledgement:', ackError?.message);
+      const errorInfo = {
+        requestId: requestId,
+        incidentId: incidentIdentifiers.incidentId,
+        error: ackError?.message,
+        stack: ackError?.stack,
+        timestamp: new Date().toISOString()
+      };
+      
+      emailTracker.emailErrors.push(errorInfo);
+      console.error(`❌ [EMAIL][ACK] Failed to send acknowledgement for request ${requestId}:`, errorInfo);
     }
 
     console.log('[ANALYSE] Starting RCA generation');
@@ -215,7 +362,17 @@ console.log('[ANALYSE] Incident data', incidentData);
     // Final RCA email to TOSENDERMAIL
     try {
       const to = process.env.TOSENDERMAIL || process.env.SENTINEL_OWNER_EMAIL || process.env.SENDGRID_FROM_EMAIL;
-      const subject = `RCA Report: ${incidentRecord.type} (Severity: ${aiSeverity})`;
+      const subject = `RCA Report: ${incidentRecord.type} (Severity: ${aiSeverity}) - Request ${requestId}`;
+      
+      console.log(`📧 [EMAIL][RCA] Preparing RCA email for request ${requestId}`, {
+        recipient: to,
+        subject: subject,
+        incidentId: incidentIdentifiers.incidentId,
+        requestId: requestId,
+        incidentType: incidentRecord.type,
+        aiSeverity: aiSeverity
+      });
+      
       if (to) {
         // Build corrected report reflecting post-assignment state and AI severity
         const finalOwner = process.env.SENTINEL_OWNER_EMAIL || process.env.SENTINEL_OWNER_UPN || 'Unassigned';
@@ -232,26 +389,120 @@ console.log('[ANALYSE] Incident data', incidentData);
           }
         };
 
-        console.log('[EMAIL][RCA] Generating Outlook-safe HTML (corrected with assignment and AI severity)', {
+        console.log(`📧 [EMAIL][RCA] Generating Outlook-safe HTML for request ${requestId} (corrected with assignment and AI severity)`, {
           owner: correctedReport.incidentDetails.owner,
           status: correctedReport.incidentDetails.status,
-          aiSeverity: correctedReport.severityAssessment.aiAssessedSeverity
+          aiSeverity: correctedReport.severityAssessment.aiAssessedSeverity,
+          requestId: requestId
         });
+        
         const html = await generateOutlookHtmlFromRCA(correctedReport);
-        console.log('[EMAIL][RCA] Sending RCA email', { to, subject, htmlLength: html?.length || 0 });
+        
+        console.log(`📧 [EMAIL][RCA] Sending RCA email for request ${requestId}`, { 
+          to, 
+          subject, 
+          htmlLength: html?.length || 0,
+          incidentId: incidentIdentifiers.incidentId,
+          requestId: requestId,
+          timestamp: new Date().toISOString()
+        });
+        
         await mailSender(to, subject, html);
-        console.log('[EMAIL][RCA] RCA email sent');
+        
+        emailTracker.rcaReportSent = true;
+        emailTracker.totalEmailsSent++;
+        emailTracker.emailRecipients.push(to);
+        emailTracker.emailTimestamps.push(new Date().toISOString());
+        
+        console.log(`✅ [EMAIL][RCA] RCA email sent successfully for request ${requestId}`, {
+          recipient: to,
+          totalEmailsSent: emailTracker.totalEmailsSent,
+          timestamp: new Date().toISOString()
+        });
       } else {
-        console.log('[EMAIL][RCA] Skipped (no TOSENDERMAIL/SENTINEL_OWNER_EMAIL/SENDGRID_FROM_EMAIL configured)');
+        console.log(`⚠️  [EMAIL][RCA] Skipped for request ${requestId} - no email recipients configured`, {
+          envVars: {
+            TOSENDERMAIL: !!process.env.TOSENDERMAIL,
+            SENTINEL_OWNER_EMAIL: !!process.env.SENTINEL_OWNER_EMAIL,
+            SENDGRID_FROM_EMAIL: !!process.env.SENDGRID_FROM_EMAIL
+          }
+        });
       }
     } catch (rcaEmailError) {
-      console.error('[EMAIL][RCA] Failed to send RCA email:', rcaEmailError?.message);
+      const errorInfo = {
+        requestId: requestId,
+        incidentId: incidentIdentifiers.incidentId,
+        error: rcaEmailError?.message,
+        stack: rcaEmailError?.stack,
+        timestamp: new Date().toISOString()
+      };
+      
+      emailTracker.emailErrors.push(errorInfo);
+      console.error(`❌ [EMAIL][RCA] Failed to send RCA email for request ${requestId}:`, errorInfo);
     }
 
-    // Add assignment result to response
+    // ===== FINAL EMAIL TRACKING SUMMARY =====
+    const totalDuration = Date.now() - startTime;
+    
+    console.log('\n' + '='.repeat(80));
+    console.log(`📊 [ANALYSE] REQUEST COMPLETED - ${requestId}`);
+    console.log(`⏱️  Total Duration: ${totalDuration}ms`);
+    console.log(`📧 Email Summary:`, {
+      requestId: requestId,
+      incidentId: incidentIdentifiers.incidentId,
+      acknowledgementSent: emailTracker.acknowledgementSent,
+      rcaReportSent: emailTracker.rcaReportSent,
+      totalEmailsSent: emailTracker.totalEmailsSent,
+      expectedEmails: 2,
+      emailRecipients: emailTracker.emailRecipients,
+      emailTimestamps: emailTracker.emailTimestamps,
+      emailErrors: emailTracker.emailErrors.length,
+      status: emailTracker.totalEmailsSent === 2 ? '✅ COMPLETE' : '⚠️  INCOMPLETE'
+    });
+    
+    if (emailTracker.totalEmailsSent !== 2) {
+      console.log(`⚠️  [ANALYSE] EMAIL COUNT MISMATCH DETECTED!`, {
+        requestId: requestId,
+        expected: 2,
+        actual: emailTracker.totalEmailsSent,
+        missing: 2 - emailTracker.totalEmailsSent,
+        details: {
+          acknowledgement: emailTracker.acknowledgementSent ? '✅ Sent' : '❌ Missing',
+          rcaReport: emailTracker.rcaReportSent ? '✅ Sent' : '❌ Missing'
+        }
+      });
+    }
+    
+    // Check for potential duplicate incidents
+    const duplicateIncidents = incidents.filter(inc => 
+      inc.id !== incidentRecord.id && 
+      (inc.originalData?.id === incidentIdentifiers.incidentId ||
+       inc.originalData?.properties?.id === incidentIdentifiers.incidentId ||
+       inc.originalData?.name === incidentIdentifiers.incidentId)
+    );
+    
+    if (duplicateIncidents.length > 0) {
+      console.log(`🚨 [ANALYSE] DUPLICATE INCIDENTS DETECTED!`, {
+        requestId: requestId,
+        currentIncidentId: incidentRecord.id,
+        duplicateCount: duplicateIncidents.length,
+        duplicates: duplicateIncidents.map(dup => ({
+          id: dup.id,
+          timestamp: dup.timestamp,
+          timeDifference: Date.now() - dup.timestamp.getTime()
+        }))
+      });
+    }
+    
+    console.log('='.repeat(80) + '\n');
+    
+    // Add assignment result and email tracking to response
     const response = {
       ...report,
-      sentinelAssignment: assignmentResult
+      sentinelAssignment: assignmentResult,
+      emailTracking: emailTracker,
+      requestId: requestId,
+      processingTime: totalDuration
     };
     
     res.json(response);
@@ -792,13 +1043,15 @@ ${conversationContext}
 
 User Query: ${query}
 
-Instructions:
+CRITICAL INSTRUCTIONS:
 1. Provide specific answers based on the actual incident data
 2. Reference real values from the incident (IDs, severity levels, etc.)
 3. If information is not available, say so clearly
-4. Keep responses concise but informative
-5. For recommendations, base them on the actual incident type and severity
-6. Use security best practices in your advice
+4. ALWAYS provide brief, concise replies by default (under 100 words)
+5. Use appropriate formatting: lists, tables, bullet points, or one-word answers
+6. For recommendations, base them on the actual incident type and severity
+7. Use security best practices in your advice
+8. Format information in the most suitable way for the context
 
 Response:`;
     
@@ -906,6 +1159,73 @@ app.post('/email/rca', async (req, res) => {
   }
 });
 
+// ===== EMAIL DEBUGGING ENDPOINTS =====
+
+// Get email statistics and debugging information
+app.get('/debug/emails', (req, res) => {
+  try {
+    const emailStats = {
+      totalIncidents: incidents.length,
+      incidentsWithEmails: incidents.filter(inc => inc.emailTracking).length,
+      emailBreakdown: incidents.reduce((acc, inc) => {
+        if (inc.emailTracking) {
+          const emailCount = inc.emailTracking.totalEmailsSent || 0;
+          acc[emailCount] = (acc[emailCount] || 0) + 1;
+        }
+        return acc;
+      }, {}),
+      recentIncidents: incidents.slice(0, 10).map(inc => ({
+        id: inc.id,
+        timestamp: inc.timestamp,
+        type: inc.type,
+        emailTracking: inc.emailTracking || 'No tracking data',
+        hasEmailTracking: !!inc.emailTracking
+      })),
+      environment: {
+        TOSENDERMAIL: !!process.env.TOSENDERMAIL,
+        SENTINEL_OWNER_EMAIL: !!process.env.SENTINEL_OWNER_EMAIL,
+        SENDGRID_FROM_EMAIL: !!process.env.SENDGRID_FROM_EMAIL,
+        SENDGRID_API_KEY: !!process.env.SENDGRID_API_KEY
+      }
+    };
+    
+    res.json(emailStats);
+  } catch (error) {
+    console.error('Error getting email debug info:', error);
+    res.status(500).json({ error: 'Failed to get email debug info' });
+  }
+});
+
+// Get detailed email tracking for a specific incident
+app.get('/debug/emails/:incidentId', (req, res) => {
+  try {
+    const incident = incidents.find(inc => inc.id === req.params.incidentId);
+    if (!incident) {
+      return res.status(404).json({ error: 'Incident not found' });
+    }
+    
+    const emailDetails = {
+      incidentId: incident.id,
+      timestamp: incident.timestamp,
+      type: incident.type,
+      emailTracking: incident.emailTracking || 'No tracking data',
+      originalData: {
+        id: incident.originalData?.id,
+        properties: incident.originalData?.properties,
+        name: incident.originalData?.name
+      }
+    };
+    
+    res.json(emailDetails);
+  } catch (error) {
+    console.error('Error getting incident email details:', error);
+    res.status(500).json({ error: 'Failed to get incident email details' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`📧 Email debugging endpoints available:`);
+  console.log(`   GET /debug/emails - Email statistics overview`);
+  console.log(`   GET /debug/emails/:incidentId - Detailed email tracking for specific incident`);
 });

@@ -89,15 +89,16 @@ function AIChatPanel({ isOpen, onClose, chatIncident, chatMode, allIncidents = [
     if (lowerQuery.includes('severity')) {
       const initial = incident?.severityAssessment?.initialSeverity || incident?.severity || 'Unknown';
       const aiAssessed = incident?.severityAssessment?.aiAssessedSeverity || initial;
-      const justification = incident?.severityAssessment?.justification || '';
-      return `The incident has an initial severity of ${initial}, but my AI analysis suggests it should be ${aiAssessed}. ${justification}`;
+      return `**Severity Assessment:**
+• Initial: ${initial}
+• AI Assessed: ${aiAssessed}`;
     }
 
     if (lowerQuery.includes('root cause')) {
       const rootCause = incident?.rootCauseAnalysis?.primaryCause || 
                        incident?.fullRCAReport?.rootCauseAnalysis?.primaryCause ||
                        'Root cause analysis is still in progress.';
-      return `Based on my analysis: ${rootCause}`;
+      return `**Root Cause:** ${rootCause}`;
     }
 
     if (lowerQuery.includes('similar')) {
@@ -106,49 +107,52 @@ function AIChatPanel({ isOpen, onClose, chatIncident, chatMode, allIncidents = [
       const similarCount = allIncidents.filter(inc => 
         inc.type === currentType && inc.id !== incident?.id
       ).length;
-      return `I found ${similarCount} similar ${currentType} incidents in our database. ${similarCount > 0 ? 'These incidents share similar attack patterns and indicators.' : 'This appears to be a unique incident pattern.'}`;
+      return `**Similar Incidents:** ${similarCount} ${currentType} incidents found.`;
     }
 
     if (lowerQuery.includes('recommend')) {
       const recommendations = incident?.recommendedActions?.immediate || [];
       if (recommendations.length > 0) {
-        return `Based on the analysis, I recommend: ${recommendations.join(', ')}`;
+        return `**Immediate Actions:**
+${recommendations.map((rec, idx) => `${idx + 1}. ${rec}`).join('\n')}`;
       }
-      return `I recommend reviewing the full incident report for detailed remediation steps.`;
+      return `**Recommendation:** Review full incident report for detailed remediation steps.`;
     }
 
     if (lowerQuery.includes('impact')) {
       const impact = incident?.impactAssessment || {};
       const affectedUsers = incident?.incidentDetails?.affectedUsers || [];
-      return `The impact includes: ${affectedUsers.length} affected users. ${impact.businessImpact?.impactDescription || 'Full impact assessment is in the incident report.'}`;
+      return `**Impact Summary:**
+• Affected Users: ${affectedUsers.length}
+• Business Impact: ${impact.businessImpact?.impactDescription || 'Under assessment'}`;
     }
 
     if (lowerQuery.includes('timeline') || lowerQuery.includes('when')) {
       const timeline = incident?.timelineOfEvents || [];
       if (timeline.length > 0) {
-        return `The incident timeline shows ${timeline.length} key events. First detection: ${timeline[0]?.timestamp || 'Unknown'}. Use the incident report view for the full timeline.`;
+        return `**Timeline:** ${timeline.length} events recorded. First detection: ${timeline[0]?.timestamp || 'Unknown'}.`;
       }
-      return `Timeline information is being compiled. Please check the full incident report.`;
+      return `**Timeline:** Information being compiled. Check full incident report.`;
     }
 
-    return `I'm analyzing that aspect of the incident. Based on the current data, ${generateContextualResponse()}`;
+    return `**Analysis:** ${generateContextualResponse()}`;
   };
 
   const generateContextualResponse = () => {
     const responses = [
-      "this appears to be a sophisticated attack that requires immediate attention.",
-      "the threat actor shows advanced persistent threat (APT) characteristics.",
-      "implementing the suggested mitigations should reduce the risk by approximately 85%.",
-      "I've identified several indicators of compromise (IOCs) that should be added to your blocklist."
+      "**Threat Level:** Sophisticated attack requiring immediate attention.",
+      "**Actor Profile:** Advanced persistent threat (APT) characteristics detected.",
+      "**Risk Reduction:** Implemented mitigations reduce risk by ~85%.",
+      "**IOCs Identified:** Multiple indicators added to blocklist."
     ];
     return responses[Math.floor(Math.random() * responses.length)];
   };
 
   const suggestedQuestions = [
-    "What's the root cause?",
-    "Show similar incidents",
-    "What's the real severity?",
-    "Recommended actions?"
+    "Root cause?",
+    "Similar incidents?",
+    "Severity level?",
+    "Actions needed?"
   ];
 
   if (!isOpen) return null;

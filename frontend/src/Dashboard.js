@@ -501,6 +501,17 @@ function Dashboard() {
     return 'status-new';
   };
 
+  const formatAffectedUsers = (users) => {
+    if (!users) return 'N/A';
+    if (Array.isArray(users)) {
+      return users.join(', ');
+    }
+    if (typeof users === 'object' && users !== null && !Array.isArray(users)) {
+      return Object.values(users).join(', ');
+    }
+    return String(users);
+  };
+
   if (loading) {
     return <div className="dashboard-loading">Loading dashboard...</div>;
   }
@@ -682,7 +693,7 @@ function Dashboard() {
                         {incident.status}
                       </span>
                     </td>
-                    <td>{incident.affectedUsers?.join(', ') || 'N/A'}</td>
+                    <td>{formatAffectedUsers(incident.affectedUsers)}</td>
                     <td className="summary-cell">{incident.executiveSummary}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -757,7 +768,7 @@ function Dashboard() {
                   <p><strong>Severity:</strong> {quickLookIncident.severity}</p>
                   <p><strong>Status:</strong> {quickLookIncident.status}</p>
                   <p><strong>Response Time:</strong> {quickLookIncident.responseTime} minutes</p>
-                  <p><strong>Affected Users:</strong> {quickLookIncident.affectedUsers?.join(', ') || 'N/A'}</p>
+                  <p><strong>Affected Users:</strong> {formatAffectedUsers(quickLookIncident.affectedUsers)}</p>
                   <p><strong>Executive Summary:</strong> {quickLookIncident.executiveSummary}</p>
                 </div>
               ) : null}
