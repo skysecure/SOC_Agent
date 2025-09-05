@@ -130,7 +130,6 @@ function normalizeRCA(o) {
     },
     verdict: s(o?.verdict),
     verdictRationale: s(o?.verdictRationale),
-    followUpTasks: a(o?.followUpTasks),
     preventionMeasures: a(o?.preventionMeasures),
     actionsTaken: o?.actionsTaken || {}
   };
@@ -300,6 +299,114 @@ export async function generateOutlookHtmlFromRCA(rca) {
     console.error('[TEMPLATE] Failed to generate email:', error);
     // Last resort fallback
     return '<div style="max-width:700px;margin:0 auto"><h2>Error</h2><p>Failed to generate email report. Please check the logs.</p></div>';
+  }
+}
+
+export async function generateAcknowledgementEmailHtml(context) {
+  try {
+    const ackData = {
+      incidentTitle: context?.incidentTitle,
+      incidentId: context?.incidentId,
+      timestampUtc: context?.timestampUtc,
+      requestId: context?.requestId,
+      orgName: context?.orgName || 'Security Operations Center',
+      contactEmail: context?.contactEmail || '',
+    };
+
+    const baseHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Incident Acknowledgement</title>
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <meta name="format-detection" content="telephone=no,email=no,address=no,date=no,url=no">
+  <meta name="x-apple-disable-message-reformatting">
+  <style>html,body{margin:0;padding:0}</style>
+  <!-- Inline CSS only; no external assets -->
+  <!-- Simple, Outlook-safe layout -->
+</head>
+<body style="margin:0;padding:0;background:#f6f8fb">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f6f8fb">
+    <tr>
+      <td align="center" style="padding:24px 12px">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="700" style="max-width:700px;width:100%;background:#ffffff;border:1px solid #e5eaf0;border-radius:6px">
+          <tr>
+            <td style="padding:0">
+              <div style="height:6px;background:#1a73e8;border-radius:6px 6px 0 0"></div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 24px 8px 24px;font-family:Segoe UI,Arial,sans-serif">
+              <div style="font-size:18px;font-weight:600;color:#202124">${ackData.orgName}</div>
+              <div style="font-size:12px;color:#5f6368;margin-top:2px">Incident Acknowledgement</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 24px 0 24px;font-family:Segoe UI,Arial,sans-serif">
+              <p style="margin:0 0 12px 0;font-size:14px;line-height:1.5;color:#202124">
+                We confirm receipt of the incident and have initiated investigation.
+              </p>
+              <p style="margin:0 0 16px 0;font-size:13px;line-height:1.5;color:#5f6368">
+                We will provide updates as they become available.
+              </p>
+            </td>
+          </tr>
+          ${(ackData.incidentTitle || ackData.incidentId || ackData.timestampUtc || ackData.requestId) ? `
+          <tr>
+            <td style="padding:8px 24px 16px 24px">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;border:1px solid #e5eaf0">
+                <tr>
+                  <td style="background:#f6f8fa;border:1px solid #e5eaf0;padding:8px 10px;font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:#202124;font-weight:600;width:40%">Incident Title</td>
+                  <td style="border:1px solid #e5eaf0;padding:8px 10px;font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:#202124">${ackData.incidentTitle || ''}</td>
+                </tr>
+                ${ackData.incidentId ? `
+                <tr>
+                  <td style="background:#f6f8fa;border:1px solid #e5eaf0;padding:8px 10px;font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:#202124;font-weight:600">Incident ID</td>
+                  <td style="border:1px solid #e5eaf0;padding:8px 10px;font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:#202124">${ackData.incidentId}</td>
+                </tr>` : ''}
+                ${ackData.timestampUtc ? `
+                <tr>
+                  <td style="background:#f6f8fa;border:1px solid #e5eaf0;padding:8px 10px;font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:#202124;font-weight:600">Timestamp (UTC)</td>
+                  <td style="border:1px solid #e5eaf0;padding:8px 10px;font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:#202124">${ackData.timestampUtc}</td>
+                </tr>` : ''}
+                ${ackData.requestId ? `
+                <tr>
+                  <td style="background:#f6f8fa;border:1px solid #e5eaf0;padding:8px 10px;font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:#202124;font-weight:600">Request ID</td>
+                  <td style="border:1px solid #e5eaf0;padding:8px 10px;font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:#202124">${ackData.requestId}</td>
+                </tr>` : ''}
+              </table>
+            </td>
+          </tr>
+          ` : ''}
+          <tr>
+            <td style="padding:8px 24px 24px 24px;font-family:Segoe UI,Arial,sans-serif">
+              ${ackData.contactEmail ? `<div style="font-size:12px;color:#5f6368;margin-bottom:8px">Contact: <a href="mailto:${ackData.contactEmail}" style="color:#1a73e8;text-decoration:none">${ackData.contactEmail}</a></div>` : ''}
+              <div style="font-size:11px;color:#9aa0a6;line-height:1.4">This message and any attachments are intended solely for the named recipient and may contain confidential information. If you are not the intended recipient, please notify the sender and delete this message.</div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  <div style="display:none;white-space:nowrap;font:15px courier;line-height:0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+  <!-- End -->
+  
+</body>
+</html>`;
+
+    try {
+      const { verifyAndEnhanceAckEmail } = await import('./emailVerificationAgent.js');
+      const enhanced = await verifyAndEnhanceAckEmail(baseHtml, ackData);
+      return enhanced;
+    } catch (e) {
+      console.error('[TEMPLATE] Ack verification failed, using base HTML');
+      return baseHtml;
+    }
+  } catch (error) {
+    console.error('[TEMPLATE] Failed to generate acknowledgement email:', error);
+    return '<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px">Incident acknowledged.</div>';
   }
 }
 

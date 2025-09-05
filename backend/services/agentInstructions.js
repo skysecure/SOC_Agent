@@ -64,7 +64,6 @@ THREAT-AWARE SEVERITY EXAMPLES:
    • Single system compromise with containment indicators
    • Basic persistence attempts without sophistication
    • Commodity malware with standard configuration
-   • Opportunistic attacks with follow-up activities
    • Automated tools used with some customization
    
    LOW (15-39 Threat Score) - Basic Threat Activity:
@@ -290,7 +289,7 @@ RCA Response Format (Mandatory Structure - DETAILED VERSION)
      * Functionality verification tests
    - **Validation Steps**: How we confirmed the threat was eliminated
 
-8. Recommendations, Actions, and Follow-Up
+8. Recommendations, Actions, 
    - **Verdict**: [False Positive/True Positive/Inconclusive/Under Investigation]
    - **Verdict Rationale**: [Detailed explanation of verdict determination]
    
@@ -317,11 +316,6 @@ RCA Response Format (Mandatory Structure - DETAILED VERSION)
      * Policy updates required
      * Training program enhancements
      * Budget considerations
-   
-   - **Follow-Up Tasks**:
-     | Task | Owner | Due Date | Priority | Status |
-     |------|-------|----------|----------|--------|
-     | [Specific task] | [Team/Person] | [Date] | [High/Medium/Low] | [Not Started/In Progress/Complete] |
    
    - **Lessons Learned**:
      * What worked well in detection/response

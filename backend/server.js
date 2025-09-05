@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { analyzeIncident } from './services/geminiService.js';
 import { updateSentinelIncident, validateSentinelConnection } from './services/sentinelService.js';
-import { generateOutlookHtmlFromRCA } from './services/emailTemplateService.js';
+import { generateOutlookHtmlFromRCA, generateAcknowledgementEmailHtml } from './services/emailTemplateService.js';
 import { mailSender } from './services/mailService.js';
 import { callAI } from './services/aiService.js';
 
@@ -264,13 +264,15 @@ app.post('/analyse', async (req, res) => {
     try {
       const ackTo = process.env.TOSENDERMAIL || process.env.SENTINEL_OWNER_EMAIL || process.env.SENDGRID_FROM_EMAIL;
       const ackSubject = 'Incident Acknowledgement';
-      const ackHtml = `<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#202124">`+
-        `<p>We have noted the incident and it is currently under investigation.</p>`+
-        `<p>Incident title: ${incidentData?.properties?.title || incidentData?.properties?.alertDisplayName || 'Security Incident'}</p>`+
-        `<p>Timestamp (UTC): ${incidentData?.properties?.createdTimeUtc || incidentData?.createdTimeUtc || new Date().toISOString()}</p>`+
-        `<p>Request ID: ${requestId}</p>`+
-        `<p>Incident ID: ${incidentIdentifiers.incidentId}</p>`+
-      `</div>`;
+      const ackContext = {
+        incidentTitle: incidentData?.properties?.title || incidentData?.properties?.alertDisplayName || 'Security Incident',
+        incidentId: incidentIdentifiers.incidentId,
+        timestampUtc: incidentData?.properties?.createdTimeUtc || incidentData?.createdTimeUtc || new Date().toISOString(),
+        requestId: requestId,
+        orgName: process.env.ORG_NAME || 'Security Operations Center',
+        contactEmail: process.env.SENTINEL_OWNER_EMAIL || process.env.SENDGRID_FROM_EMAIL || ''
+      };
+      const ackHtml = await generateAcknowledgementEmailHtml(ackContext);
       
       console.log(`📧 [EMAIL][ACK] Preparing acknowledgement email for request ${requestId}`, {
         recipient: ackTo,
@@ -351,7 +353,20 @@ app.post('/analyse', async (req, res) => {
       executiveSummary: report.executiveSummary,
       affectedUsers: extractAffectedUsers(report),
       responseTime: calculateResponseTime(incidentData),
-      incidentNumber: incidentData?.properties?.incidentNumber || incidentData?.properties?.providerIncidentId || null
+      incidentNumber: incidentData?.properties?.incidentNumber || incidentData?.properties?.providerIncidentId || null,
+      // Add emailTracking to ensure duplicate detection works correctly
+      emailTracking: {
+        requestId: requestId,
+        incidentId: incidentIdentifiers.incidentId,
+        dataHash: incidentIdentifiers.dataHash,
+        logicApp: incidentIdentifiers.logicApp,
+        acknowledgementSent: emailTracker.acknowledgementSent,
+        rcaReportSent: false, // Will be updated after RCA email is sent
+        totalEmailsSent: emailTracker.totalEmailsSent,
+        emailRecipients: [...emailTracker.emailRecipients],
+        emailTimestamps: [...emailTracker.emailTimestamps],
+        emailErrors: [...emailTracker.emailErrors]
+      }
     };
     
     incidents.unshift(incidentRecord); // Add to beginning of array
@@ -454,6 +469,14 @@ app.post('/analyse', async (req, res) => {
         emailTracker.emailRecipients.push(to);
         emailTracker.emailTimestamps.push(new Date().toISOString());
         
+        // Update the stored incident record with final email tracking data
+        if (incidentRecord.emailTracking) {
+          incidentRecord.emailTracking.rcaReportSent = true;
+          incidentRecord.emailTracking.totalEmailsSent = emailTracker.totalEmailsSent;
+          incidentRecord.emailTracking.emailRecipients = [...emailTracker.emailRecipients];
+          incidentRecord.emailTracking.emailTimestamps = [...emailTracker.emailTimestamps];
+        }
+        
         console.log(`✅ [EMAIL][RCA] RCA email sent successfully for request ${requestId}`, {
           recipient: to,
           totalEmailsSent: emailTracker.totalEmailsSent,
@@ -478,6 +501,12 @@ app.post('/analyse', async (req, res) => {
       };
       
       emailTracker.emailErrors.push(errorInfo);
+      
+      // Update the stored incident record with error info
+      if (incidentRecord.emailTracking && incidentRecord.emailTracking.emailErrors) {
+        incidentRecord.emailTracking.emailErrors.push(errorInfo);
+      }
+      
       console.error(`❌ [EMAIL][RCA] Failed to send RCA email for request ${requestId}:`, errorInfo);
     }
 

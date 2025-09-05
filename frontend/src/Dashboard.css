@@ -454,6 +454,8 @@
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #f9fafb;
+  /* Ensure sticky elements inside stay sticky relative to this container */
+  position: relative;
 }
 
 .modal-content h2 {
