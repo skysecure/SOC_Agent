@@ -1,0 +1,255 @@
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.modern-report {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+/* Overview bar */
+.report-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.overview-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(255,255,255,0.6);
+  -webkit-backdrop-filter: saturate(150%) blur(6px);
+  backdrop-filter: saturate(150%) blur(6px);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.overview-bar.scrolled {
+  background: rgba(255,255,255,0.5);
+  -webkit-backdrop-filter: saturate(150%) blur(14px);
+  backdrop-filter: saturate(150%) blur(14px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+}
+
+.overview-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.overview-label {
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.verdict-chip {
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  border: 1px solid transparent;
+}
+.verdict-chip.true { background: #fee2e2; color: #b91c1c; border-color: #ef4444; }
+.verdict-chip.false { background: #dbeafe; color: #1e40af; border-color: #3b82f6; }
+.verdict-chip.maybe { background: #faf5ff; color: #6b21a8; border-color: #a855f7; }
+
+.overview-spacer { flex: 1; }
+
+.overview-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toolbar-btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s ease;
+}
+
+.toolbar-btn:hover { background: #1d4ed8; }
+
+.compact-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #374151;
+  font-size: 0.85rem;
+}
+
+/* removed compact mode */
+
+/* Section navigator */
+.section-nav { margin-top: 0.5rem; }
+
+.nav-container {
+  background: rgba(255,255,255,0.65);
+  -webkit-backdrop-filter: saturate(140%) blur(4px);
+  backdrop-filter: saturate(140%) blur(4px);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 12px;
+  padding: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  overflow-x: auto;
+}
+
+.nav-container.scrolled {
+  background: rgba(255,255,255,0.5);
+  -webkit-backdrop-filter: saturate(140%) blur(12px);
+  backdrop-filter: saturate(140%) blur(12px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.nav-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+  min-height: 36px;
+}
+
+.nav-chip {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.nav-chip:hover { background: #e5e7eb; }
+
+.nav-chip.active {
+  background: #e0e7ff;
+  border-color: #c7d2fe;
+  color: #1e3a8a;
+}
+
+.report-card {
+  background: white;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 12px;
+  padding: 1.25rem 1.25rem 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  animation: cardIn 0.35s ease-out both;
+  scroll-margin-top: 140px; /* account for combined sticky header height */
+}
+
+.report-card:hover {
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
+  transition: all 0.2s ease;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.section-header h3 { flex: 1; }
+
+.toggle-btn {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  line-height: 26px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #374151;
+}
+
+/* Animated section bodies for smoother open/close */
+.section-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease, opacity 0.35s ease, transform 0.35s ease;
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.section-body.open {
+  max-height: 2000px; /* sufficiently large to fit content */
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Back to top floating button */
+.to-top-button {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  box-shadow: 0 8px 24px rgba(37,99,235,0.35);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  z-index: 60;
+}
+
+.to-top-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(37,99,235,0.45);
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.section-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #eef2ff;
+}
+
+/* Reuse and slightly enhance existing styles via cascade */
+.report-card .executive-summary { 
+  font-size: 1.02rem;
+  line-height: 1.65;
+}
+
+.report-card .timeline-table table,
+.report-card .followup-table,
+.report-card .log-interpretation-table {
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.report-card details summary {
+  background: #f3f4f6;
+}
+
+/* Keep existing badge/table classes from App.css and Dashboard.css */
+

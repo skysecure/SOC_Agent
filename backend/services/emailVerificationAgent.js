@@ -20,6 +20,25 @@ export async function verifyAndFixEmailReport(htmlContent, fullRCAData) {
   }
 }
 
+export async function verifyAndEnhanceAckEmail(htmlContent, ackData) {
+  try {
+    const aiResponse = await callAI('EMAIL_ACK_FORMATTER', {
+      htmlContent,
+      ackData
+    }, {
+      temperature: 0.1,
+      maxTokens: 4000
+    });
+
+    const fixedHtml = extractHtmlFromResponse(aiResponse);
+    console.log('[VERIFICATION] Successfully enhanced acknowledgement email');
+    return fixedHtml;
+  } catch (error) {
+    console.error('[VERIFICATION] Failed to enhance acknowledgement email:', error);
+    throw error;
+  }
+}
+
 // Deprecated - now using centralized prompt from config/prompts.js
 // function createDynamicVerificationPrompt is no longer needed
 

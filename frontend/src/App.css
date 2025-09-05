@@ -278,6 +278,8 @@
   border: 1px solid rgba(0,0,0,0.05);
   animation: fadeIn 0.5s ease-out;
   position: relative;
+  /* provide containing block for sticky overview/nav when not in modal */
+  overflow: visible;
 }
 
 .report-section h2 {

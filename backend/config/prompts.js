@@ -262,14 +262,13 @@ RCA Response Format (Mandatory Structure - DETAILED VERSION)
    - **Recovery Actions**: System rebuilds, data restoration
    - **Validation Steps**: Threat elimination confirmation
 
-8. Recommendations, Actions, and Follow-Up
+8. Recommendations, Actions,
    - **Verdict**: [False Positive/True Positive/Inconclusive]
    - **Verdict Rationale**: Detailed explanation
    - **Actions Taken**: Triage, containment, eradication, recovery
    - **IMMEDIATE ACTIONS**: Within 24 hours
    - **SHORT-TERM IMPROVEMENTS**: Within 7 days
    - **LONG-TERM STRATEGIC**: Within 30 days
-   - **Follow-Up Tasks**: Task list with owners and dates
    - **Lessons Learned**: What worked, what failed, improvements
 
 9. Evidence, Technical Artifacts, and Entity Analysis
@@ -504,6 +503,54 @@ Your response should start with <!DOCTYPE html> and be ready to send as an email
       }
     },
 
+    // Acknowledgement Email Formatter
+    EMAIL_ACK_FORMATTER: {
+      role: "Email Template Enhancer",
+      purpose: "Transform a simple acknowledgement notice into a polished, Outlook-safe HTML email",
+      getFullPrompt: function(htmlContent, ackData) {
+        return `You are a professional communications specialist for a Security Operations Center (SOC). Your task is to transform the provided acknowledgement email HTML into a polished, responsive, Outlook-safe email.
+
+CURRENT HTML CONTENT:
+${htmlContent}
+
+ACKNOWLEDGEMENT CONTEXT (JSON):
+${JSON.stringify(ackData, null, 2)}
+
+OBJECTIVE:
+- Produce a professional acknowledgement email confirming receipt of the incident and that investigation has started.
+- Keep content concise and reassuring. Use neutral, professional tone.
+
+CONTENT REQUIREMENTS:
+1. Header:
+   - Organization/SOC name (use "Security Operations Center" if none provided)
+   - Optional small subtitle: "Incident Acknowledgement"
+2. Body:
+   - One short paragraph acknowledging receipt and that investigation is underway
+   - Key incident details in a 2-column table: Incident Title, Incident ID, Timestamp (UTC), Request ID
+   - Optional line about next update expectations (e.g., "We will provide updates as they become available.")
+3. Footer:
+   - Contact email if present in data; otherwise omit
+   - Simple confidentiality note
+
+FORMATTING RULES (MUST FOLLOW):
+- Start with <!DOCTYPE html> and a full <html> document
+- Max width 700px centered container
+- Use only inline CSS and table-based layout for compatibility
+- Safe web fonts: Segoe UI, Arial, sans-serif
+- Clear visual hierarchy: header (brand color bar), content, details table, footer
+- Accessible color contrast; avoid images and external assets
+- Do not add tracking pixels or remote resources
+
+DATA RULES:
+- Use values from ackData when available: incidentTitle, incidentId, timestampUtc, requestId
+- If a field is missing, omit the row (do NOT show placeholders)
+
+OUTPUT:
+- Return ONLY the complete, production-ready HTML (no markdown, no explanation)
+- Ensure the HTML is well-formed and suitable for email clients including Outlook.`;
+      }
+    },
+
     // Chat Assistant
     CHAT_ASSISTANT: {
       role: "AI Security Assistant",
@@ -544,6 +591,10 @@ export function getPromptWithData(agentName, data = {}) {
   // For agents with dynamic prompts
   if (agentName === 'EMAIL_VERIFIER' && typeof agent.getFullPrompt === 'function') {
     return agent.getFullPrompt(data.htmlContent, data.rcaData);
+  }
+
+  if (agentName === 'EMAIL_ACK_FORMATTER' && typeof agent.getFullPrompt === 'function') {
+    return agent.getFullPrompt(data.htmlContent, data.ackData);
   }
 
   if (agentName === 'CHAT_ASSISTANT' && typeof agent.getFullPrompt === 'function') {

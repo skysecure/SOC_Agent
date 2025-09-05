@@ -355,7 +355,6 @@ function transformResponse(parsedResponse, incidentData) {
     verdict: parsedResponse.recommendationsActionsFollowUp?.verdict || "Under Investigation",
     verdictRationale: parsedResponse.recommendationsActionsFollowUp?.verdictRationale || "",
     actionsTaken: parsedResponse.recommendationsActionsFollowUp?.actionsTaken || {},
-    followUpTasks: parsedResponse.recommendationsActionsFollowUp?.followUpTasks || [],
     
     preventionMeasures: parsedResponse.recommendationsActionsFollowUp?.lessonsLearned || 
                        parsedResponse.recommendations?.lessonsLearned || [],
