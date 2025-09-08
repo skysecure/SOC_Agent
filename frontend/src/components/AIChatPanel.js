@@ -2,6 +2,62 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import './AIChatPanel.css';
 
+
+const IP = process.env.IP || "localhost";
+const PORT = process.env.PORT || "3002";
+
+// Basic, safe formatter for simple markdown-like output
+function escapeHtml(input) {
+  return String(input)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatBasicMarkdown(text) {
+  let html = escapeHtml(text || '');
+
+  // Bold: **text**
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+  // Insert line breaks before numbered items 1.-9. when inline
+  for (let i = 1; i <= 9; i++) {
+    const pattern = new RegExp('\\\s' + i + '\\.' + '\\s', 'g');
+    html = html.replace(pattern, '<br/>' + i + '. ');
+  }
+
+  // Add line breaks before bullet • when inline
+  html = html.replace(/\s•\s/g, '<br/>• ');
+
+  // Preserve newlines
+  html = html.replace(/\n/g, '<br/>');
+
+  return html;
+}
+
+// Concise response utilities (structure-based, no char limits)
+function isExpandRequested(queryText) {
+  return /\b(more|detail|details|full|expand|long|complete|all)\b/i.test(queryText || '');
+}
+
+function condenseConcise(rawText, userQuery) {
+  if (isExpandRequested(userQuery)) return String(rawText || '').trim();
+
+  const original = String(rawText || '').trim();
+  if (!original) return original;
+
+  const lines = original.split(/\r?\n/);
+  const bulletLike = lines.filter(line => /^(\s*(?:\d+\.\s|[-*•]\s))/.test(line));
+  if (bulletLike.length > 0) {
+    return bulletLike.slice(0, 3).join('\n');
+  }
+
+  const sentences = original.split(/(?<=[.!?])\s+/);
+  return sentences.slice(0, 2).join(' ');
+}
+
 function AIChatPanel({ isOpen, onClose, chatIncident, chatMode, allIncidents = [] }) {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
@@ -53,7 +109,7 @@ function AIChatPanel({ isOpen, onClose, chatIncident, chatMode, allIncidents = [
 
     try {
       // Call backend API to get Gemini response
-      const response = await axios.post('http://localhost:3002/ai/chat', {
+      const response = await axios.post(`http://${IP}:${PORT}/ai/chat`, {
         query: inputValue,
         currentIncident: chatMode === 'incident' ? chatIncident : null,
         chatMode: chatMode,
@@ -61,20 +117,23 @@ function AIChatPanel({ isOpen, onClose, chatIncident, chatMode, allIncidents = [
         conversationHistory: messages
       });
 
+      const modelText = response?.data?.response ?? '';
+      const concise = condenseConcise(modelText, userMessage.text);
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         type: 'ai',
-        text: response.data.response,
+        text: concise,
         timestamp: new Date()
       }]);
     } catch (error) {
       console.error('AI Chat error:', error);
       // Fallback to local response generation
       const aiResponse = generateAIResponse(inputValue, chatMode === 'incident' ? chatIncident : null);
+      const conciseFallback = condenseConcise(aiResponse, userMessage.text);
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         type: 'ai',
-        text: aiResponse,
+        text: conciseFallback,
         timestamp: new Date()
       }]);
     } finally {
@@ -178,7 +237,7 @@ ${recommendations.map((rec, idx) => `${idx + 1}. ${rec}`).join('\n')}`;
               {message.type === 'ai' ? '🤖' : '👤'}
             </div>
             <div className="ai-message-content">
-              <p>{message.text}</p>
+              <p dangerouslySetInnerHTML={{ __html: formatBasicMarkdown(message.text) }} />
               <span className="ai-message-time">
                 {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>

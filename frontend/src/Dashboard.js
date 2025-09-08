@@ -12,6 +12,8 @@ import AIChatPanel from './components/AIChatPanel';
 import ThreatIntelligence from './components/ThreatIntelligence';
 
 
+const IP = process.env.IP || "localhost";
+const PORT = process.env.PORT || "3002";
 
 // Recursive component to render any JSON structure
 function JsonRenderer({ data, depth = 0 }) {
@@ -126,7 +128,7 @@ function Dashboard() {
 
   const fetchIncidents = async () => {
     try {
-      const response = await axios.get('http://localhost:3002/incidents');
+      const response = await axios.get(`http://${IP}:${PORT}/incidents`);
       setIncidents(response.data);
     } catch (err) {
       setError('Failed to fetch incidents: ' + (err.message || 'Unknown error'));
@@ -474,7 +476,7 @@ function Dashboard() {
                             setSelectedIncident(incident);
                             setLoadingDetails(true);
                             try {
-                              const response = await axios.get(`${IP}:${PORT}/incidents/${incident.id}`);
+                              const response = await axios.get(`http://${IP}:${PORT}/incidents/${incident.id}`);
                               setSelectedIncidentDetails(response.data);
                             } catch (err) {
                               console.error('Failed to fetch incident details:', err);
@@ -508,7 +510,7 @@ function Dashboard() {
         </section>
 
         {/* Incident Detail Modal */}
-        {(quickLookIncident || selectedIncidentDetails) && (
+        {(quickLookIncident || loadingDetails || selectedIncidentDetails) && (
           <div className="modal-overlay" onClick={() => {
             setQuickLookIncident(null);
             setSelectedIncidentDetails(null);
