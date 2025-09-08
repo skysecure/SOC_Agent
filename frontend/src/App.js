@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import './App.css';
 import ReportDisplay from './components/ReportDisplay';
 
+
+const IP = process.env.IP || "localhost";
+const PORT = process.env.PORT || "3002";
 // Recursive component to render any JSON structure
 function JsonRenderer({ data, depth = 0 }) {
   // Handle null or undefined
@@ -96,16 +99,18 @@ function App() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const submittingRef = useRef(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
     setError('');
     setReport(null);
-    http://10.217.108.8/
     try {
       const parsedData = JSON.parse(incidentData);
-      const response = await axios.post('http://localhost:3002/analyse', parsedData);
+      const response = await axios.post(`http://${IP}:${PORT}/analyse`, parsedData);
       setReport(response.data);
     } catch (err) {
       if (err.message.includes('JSON')) {
@@ -119,6 +124,7 @@ function App() {
       }
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 
