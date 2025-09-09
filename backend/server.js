@@ -7,6 +7,7 @@ import { updateSentinelIncident, validateSentinelConnection } from './services/s
 import { generateOutlookHtmlFromRCA, generateAcknowledgementEmailHtml } from './services/emailTemplateService.js';
 import { mailSender } from './services/mailService.js';
 import { callAI } from './services/aiService.js';
+import { sseHandler, emitStage } from './services/eventStream.js';
 
 dotenv.config();
 
@@ -15,6 +16,8 @@ const PORT = process.env.PORT || 3002;
 
 app.use(cors());
 app.use(express.json());
+// SSE stream for agent live updates (global stream)
+app.get('/agent/stream', sseHandler);
 
 // Simple in-memory storage for incidents (in production, use a database)
 const incidents = [];
@@ -169,7 +172,7 @@ app.post('/analyse', async (req, res) => {
     console.log('='.repeat(80));
     
     const incidentData = (req?.body?.body?.object) ? req.body?.body?.object : req.body;
-    
+
     // Extract unique identifiers for deduplication tracking
     const incidentIdentifiers = {
       requestId: requestId,
@@ -191,6 +194,24 @@ app.post('/analyse', async (req, res) => {
     };
     
     console.log(`🔍 [ANALYSE] Incident Identifiers:`, incidentIdentifiers);
+    
+    // Live updates: pipeline started (enriched with identifiers)
+    emitStage({ 
+      stage: 'INCIDENT_RECEIVED', 
+      status: 'done', 
+      requestId, 
+      incidentId: incidentIdentifiers.incidentId,
+      message: 'Analysis request received',
+      meta: { incidentNumber: incidentIdentifiers.incidentId }
+    });
+    emitStage({ 
+      stage: 'PIPELINE_STARTED', 
+      status: 'in_progress', 
+      requestId,
+      incidentId: incidentIdentifiers.incidentId,
+      message: 'Pipeline initiated',
+      meta: { incidentNumber: incidentIdentifiers.incidentId }
+    });
     console.log(`📝 [ANALYSE] Incident Data Preview:`, {
       hasBody: !!req.body?.body,
       hasObject: !!req.body?.body?.object,
@@ -239,6 +260,7 @@ app.post('/analyse', async (req, res) => {
         message: 'Duplicate request blocked - incident already processed'
       };
       
+      emitStage({ stage: 'PIPELINE_COMPLETED', status: 'done', requestId, message: 'Duplicate request blocked - existing data returned', meta: { duplicateBlocked: true } });
       return res.json(response);
     } else {
       console.log(`✅ [ANALYSE] No duplicate incidents found - proceeding with analysis`);
@@ -273,6 +295,7 @@ app.post('/analyse', async (req, res) => {
         contactEmail: process.env.SENTINEL_OWNER_EMAIL || process.env.SENDGRID_FROM_EMAIL || ''
       };
       const ackHtml = await generateAcknowledgementEmailHtml(ackContext);
+      emitStage({ stage: 'ACK_PREPARED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Acknowledgement prepared' });
       
       console.log(`📧 [EMAIL][ACK] Preparing acknowledgement email for request ${requestId}`, {
         recipient: ackTo,
@@ -292,6 +315,7 @@ app.post('/analyse', async (req, res) => {
         });
         
         await mailSender(ackTo, ackSubject, ackHtml);
+        emitStage({ stage: 'ACK_SENT', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: `Ack email sent to ${ackTo}` });
         
         emailTracker.acknowledgementSent = true;
         emailTracker.totalEmailsSent++;
@@ -323,9 +347,11 @@ app.post('/analyse', async (req, res) => {
       
       emailTracker.emailErrors.push(errorInfo);
       console.error(`❌ [EMAIL][ACK] Failed to send acknowledgement for request ${requestId}:`, errorInfo);
+      emitStage({ stage: 'ACK_SENT', status: 'error', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Ack email failed', meta: { error: ackError?.message } });
     }
 
     console.log('[ANALYSE] Starting RCA generation');
+    emitStage({ stage: 'RCA_SEVERITY_STARTED', status: 'in_progress', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA & severity assessment started' });
     const report = await analyzeIncident(incidentData);
     console.log('[ANALYSE] RCA generated');
     
@@ -340,6 +366,7 @@ app.post('/analyse', async (req, res) => {
       aiAssessedSeverity: aiSeverity,
       severityChanged: report.severityAssessment?.initialSeverity !== aiSeverity
     });
+    emitStage({ stage: 'RCA_SEVERITY_COMPLETED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA & severity assessment completed', meta: { initialSeverity: report.severityAssessment?.initialSeverity, aiSeverity } });
     
     // Store the incident with metadata
     const incidentRecord = {
@@ -387,6 +414,7 @@ app.post('/analyse', async (req, res) => {
         console.log('[SENTINEL] Attempting auto-assignment/update', { incidentArmId, aiSeverity });
         
         const sentinelStartTime = Date.now();
+        emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'in_progress', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Updating Sentinel incident' });
         
         // Pass AI-assessed severity to Sentinel update (owner/status taken from env)
         assignmentResult = await updateSentinelIncident(
@@ -404,14 +432,18 @@ app.post('/analyse', async (req, res) => {
             incidentId: assignmentResult.incidentId,
             severity: assignmentResult.severity
           });
+          emitStage({ stage: 'SENTINEL_UPDATED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel updated', meta: { durationMs: sentinelDuration, severity: assignmentResult.severity } });
         } else {
           console.error(`[SENTINEL] Update failed (${sentinelDuration}ms)`, assignmentResult);
+          emitStage({ stage: 'SENTINEL_UPDATED', status: 'error', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update failed', meta: { durationMs: sentinelDuration, error: assignmentResult?.error } });
         }
       } else {
         console.log('[SENTINEL] Skipping update (no incident ARM id found)');
+        emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - no ARM id' });
       }
     } else {
       console.log('[SENTINEL] Skipping update (config not set)');
+      emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - config missing' });
     }
 
     // Final RCA email to TOSENDERMAIL
@@ -452,6 +484,7 @@ app.post('/analyse', async (req, res) => {
         });
         
         const html = await generateOutlookHtmlFromRCA(correctedReport);
+        emitStage({ stage: 'RCA_EMAIL_PREPARED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA email prepared' });
         
         console.log(`📧 [EMAIL][RCA] Sending RCA email for request ${requestId}`, { 
           to, 
@@ -463,6 +496,7 @@ app.post('/analyse', async (req, res) => {
         });
         
         await mailSender(to, subject, html);
+        emitStage({ stage: 'RCA_EMAIL_SENT', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: `RCA email sent to ${to}` });
         
         emailTracker.rcaReportSent = true;
         emailTracker.totalEmailsSent++;
@@ -508,6 +542,7 @@ app.post('/analyse', async (req, res) => {
       }
       
       console.error(`❌ [EMAIL][RCA] Failed to send RCA email for request ${requestId}:`, errorInfo);
+      emitStage({ stage: 'RCA_EMAIL_SENT', status: 'error', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA email failed', meta: { error: rcaEmailError?.message } });
     }
 
     // ===== FINAL EMAIL TRACKING SUMMARY =====
@@ -574,6 +609,7 @@ app.post('/analyse', async (req, res) => {
       processingTime: totalDuration
     };
     
+    emitStage({ stage: 'PIPELINE_COMPLETED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Pipeline completed', meta: { totalDuration } });
     res.json(response);
   } catch (error) {
     console.error('Analysis error:', error);

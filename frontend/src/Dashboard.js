@@ -10,6 +10,7 @@ import './Dashboard.css';
 import ReportDisplay from './components/ReportDisplay';
 import AIChatPanel from './components/AIChatPanel';
 import ThreatIntelligence from './components/ThreatIntelligence';
+import LiveAgentFeed from './components/LiveAgentFeed';
 
 
 const IP = process.env.IP || "localhost";
@@ -574,6 +575,8 @@ function Dashboard() {
         chatMode={chatMode}
         allIncidents={incidents}
       />
+      {/* Live Agent Feed overlay (non-intrusive) */}
+      <LiveAgentFeed />
     </div>
   );
 }
