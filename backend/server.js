@@ -19,6 +19,46 @@ app.use(express.json());
 // SSE stream for agent live updates (global stream)
 app.get('/agent/stream', sseHandler);
 
+// Simple app health endpoint
+app.get('/health', (req, res) => {
+  const startedAt = Date.now();
+  try {
+    const aiProvider = process.env.AI_PROVIDER || 'gemini';
+    const hasGemini = !!process.env.GEMINI_API_KEY;
+    const hasOpenAI = !!process.env.OPENAI_API_KEY;
+    const hasSendGrid = !!process.env.SENDGRID_API_KEY;
+    const sentinelConfigured = !!(
+      process.env.AZURE_SUBSCRIPTION_ID &&
+      process.env.AZURE_RESOURCE_GROUP &&
+      process.env.AZURE_WORKSPACE_NAME
+    );
+
+    const payload = {
+      ok: true,
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptimeSec: Math.round(process.uptime()),
+      pid: process.pid,
+      env: {
+        aiProvider,
+        hasGeminiKey: hasGemini,
+        hasOpenAIKey: hasOpenAI,
+        hasSendgridKey: hasSendGrid,
+        sseEnabled: true
+      },
+      services: {
+        email: hasSendGrid,
+        sentinelConfigured
+      },
+      latencyMs: Date.now() - startedAt
+    };
+
+    res.json(payload);
+  } catch (error) {
+    res.status(500).json({ ok: false, status: 'error', error: error.message });
+  }
+});
+
 // Simple in-memory storage for incidents (in production, use a database)
 const incidents = [];
 
