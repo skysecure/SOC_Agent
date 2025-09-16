@@ -8,6 +8,7 @@ import { generateOutlookHtmlFromRCA, generateAcknowledgementEmailHtml } from './
 import { mailSender } from './services/mailService.js';
 import { callAI } from './services/aiService.js';
 import { sseHandler, emitStage } from './services/eventStream.js';
+import { listTenants, getTenantBySubscriptionId, getTenantByKey, extractSubscriptionIdFromArmId } from './services/tenantService.js';
 
 dotenv.config();
 
@@ -27,11 +28,7 @@ app.get('/health', (req, res) => {
     const hasGemini = !!process.env.GEMINI_API_KEY;
     const hasOpenAI = !!process.env.OPENAI_API_KEY;
     const hasSendGrid = !!process.env.SENDGRID_API_KEY;
-    const sentinelConfigured = !!(
-      process.env.AZURE_SUBSCRIPTION_ID &&
-      process.env.AZURE_RESOURCE_GROUP &&
-      process.env.AZURE_WORKSPACE_NAME
-    );
+    const sentinelConfigured = true; // multi-tenant; configuration per-tenant
 
     const payload = {
       ok: true,
@@ -235,14 +232,36 @@ app.post('/analyse', async (req, res) => {
     
     console.log(`🔍 [ANALYSE] Incident Identifiers:`, incidentIdentifiers);
     
-    // Live updates: pipeline started (enriched with identifiers)
+    // Resolve tenant context from subscriptionId in ARM path (id or name)
+    const armIdSource = incidentData?.id || incidentData?.name || '';
+    const resolvedSubscriptionId = extractSubscriptionIdFromArmId(armIdSource);
+    const tenantCtx = resolvedSubscriptionId ? getTenantBySubscriptionId(resolvedSubscriptionId) : null;
+
+    if (!tenantCtx) {
+      console.error('❌ Unknown tenant for subscription', { requestId, subscriptionId: resolvedSubscriptionId });
+      emitStage({ 
+        stage: 'INCIDENT_RECEIVED', 
+        status: 'error', 
+        requestId, 
+        incidentId: incidentIdentifiers.incidentId,
+        message: 'Unknown tenant for subscription',
+        meta: { subscriptionId: resolvedSubscriptionId }
+      });
+      return res.status(400).json({
+        error: 'Unknown tenant',
+        requestId,
+        subscriptionId: resolvedSubscriptionId
+      });
+    }
+
+    // Live updates: pipeline started (enriched with identifiers + tenant)
     emitStage({ 
       stage: 'INCIDENT_RECEIVED', 
       status: 'done', 
       requestId, 
       incidentId: incidentIdentifiers.incidentId,
       message: 'Analysis request received',
-      meta: { incidentNumber: incidentIdentifiers.incidentId }
+      meta: { incidentNumber: incidentIdentifiers.incidentId, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId }
     });
     emitStage({ 
       stage: 'PIPELINE_STARTED', 
@@ -250,7 +269,7 @@ app.post('/analyse', async (req, res) => {
       requestId,
       incidentId: incidentIdentifiers.incidentId,
       message: 'Pipeline initiated',
-      meta: { incidentNumber: incidentIdentifiers.incidentId }
+      meta: { incidentNumber: incidentIdentifiers.incidentId, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId }
     });
     console.log(`📝 [ANALYSE] Incident Data Preview:`, {
       hasBody: !!req.body?.body,
@@ -322,9 +341,9 @@ app.post('/analyse', async (req, res) => {
     
     console.log(`📧 [EMAIL][TRACKING] Email tracking initialized for request ${requestId}`);
     
-    // Acknowledgement email to TOSENDERMAIL
+    // Acknowledgement email to tenant recipients (customerMail.toSenderMail)
     try {
-      const ackTo = process.env.TOSENDERMAIL || process.env.SENTINEL_OWNER_EMAIL || process.env.SENDGRID_FROM_EMAIL;
+      const ackTo = tenantCtx?.customerMail?.toSenderMail;
       const ackSubject = 'Incident Acknowledgement';
       const ackContext = {
         incidentTitle: incidentData?.properties?.title || incidentData?.properties?.alertDisplayName || 'Security Incident',
@@ -332,20 +351,20 @@ app.post('/analyse', async (req, res) => {
         timestampUtc: incidentData?.properties?.createdTimeUtc || incidentData?.createdTimeUtc || new Date().toISOString(),
         requestId: requestId,
         orgName: process.env.ORG_NAME || 'Security Operations Center',
-        contactEmail: process.env.SENTINEL_OWNER_EMAIL || process.env.SENDGRID_FROM_EMAIL || ''
+        contactEmail: process.env.SENDGRID_FROM_EMAIL || ''
       };
       const ackHtml = await generateAcknowledgementEmailHtml(ackContext);
-      emitStage({ stage: 'ACK_PREPARED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Acknowledgement prepared' });
+      emitStage({ stage: 'ACK_PREPARED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Acknowledgement prepared', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
       
       console.log(`📧 [EMAIL][ACK] Preparing acknowledgement email for request ${requestId}`, {
-        recipient: ackTo,
+        recipients: ackTo,
         subject: ackSubject,
         htmlLength: ackHtml.length,
         incidentId: incidentIdentifiers.incidentId,
         requestId: requestId
       });
       
-      if (ackTo) {
+      if (Array.isArray(ackTo) && ackTo.length > 0) {
         console.log(`📧 [EMAIL][ACK] Sending acknowledgement email for request ${requestId}`, { 
           to: ackTo, 
           subject: ackSubject,
@@ -355,23 +374,21 @@ app.post('/analyse', async (req, res) => {
         });
         
         await mailSender(ackTo, ackSubject, ackHtml);
-        emitStage({ stage: 'ACK_SENT', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: `Ack email sent to ${ackTo}` });
+        emitStage({ stage: 'ACK_SENT', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Ack email sent', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
         
         emailTracker.acknowledgementSent = true;
         emailTracker.totalEmailsSent++;
-        emailTracker.emailRecipients.push(ackTo);
+        emailTracker.emailRecipients.push(...ackTo);
         emailTracker.emailTimestamps.push(new Date().toISOString());
         
         console.log(`✅ [EMAIL][ACK] Acknowledgement email sent successfully for request ${requestId}`, {
-          recipient: ackTo,
+          recipients: ackTo,
           totalEmailsSent: emailTracker.totalEmailsSent,
           timestamp: new Date().toISOString()
         });
       } else {
         console.log(`⚠️  [EMAIL][ACK] Skipped for request ${requestId} - no email recipients configured`, {
           envVars: {
-            TOSENDERMAIL: !!process.env.TOSENDERMAIL,
-            SENTINEL_OWNER_EMAIL: !!process.env.SENTINEL_OWNER_EMAIL,
             SENDGRID_FROM_EMAIL: !!process.env.SENDGRID_FROM_EMAIL
           }
         });
@@ -391,7 +408,7 @@ app.post('/analyse', async (req, res) => {
     }
 
     console.log('[ANALYSE] Starting RCA generation');
-    emitStage({ stage: 'RCA_SEVERITY_STARTED', status: 'in_progress', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA & severity assessment started' });
+    emitStage({ stage: 'RCA_SEVERITY_STARTED', status: 'in_progress', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA & severity assessment started', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
     const report = await analyzeIncident(incidentData);
     console.log('[ANALYSE] RCA generated');
     
@@ -406,7 +423,7 @@ app.post('/analyse', async (req, res) => {
       aiAssessedSeverity: aiSeverity,
       severityChanged: report.severityAssessment?.initialSeverity !== aiSeverity
     });
-    emitStage({ stage: 'RCA_SEVERITY_COMPLETED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA & severity assessment completed', meta: { initialSeverity: report.severityAssessment?.initialSeverity, aiSeverity } });
+    emitStage({ stage: 'RCA_SEVERITY_COMPLETED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA & severity assessment completed', meta: { initialSeverity: report.severityAssessment?.initialSeverity, aiSeverity, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
     
     // Store the incident with metadata
     const incidentRecord = {
@@ -421,6 +438,14 @@ app.post('/analyse', async (req, res) => {
       affectedUsers: extractAffectedUsers(report),
       responseTime: calculateResponseTime(incidentData),
       incidentNumber: incidentData?.properties?.incidentNumber || incidentData?.properties?.providerIncidentId || null,
+      tenant: {
+        key: tenantCtx.key,
+        displayName: tenantCtx.displayName,
+        subscriptionId: tenantCtx.subscriptionId,
+        resourceGroup: tenantCtx.resourceGroup,
+        workspaceName: tenantCtx.workspaceName,
+        ownerName: tenantCtx.ownerName
+      },
       // Add emailTracking to ensure duplicate detection works correctly
       emailTracking: {
         requestId: requestId,
@@ -441,9 +466,7 @@ app.post('/analyse', async (req, res) => {
     
     // Auto-assign incident in Sentinel if configuration is available
     let assignmentResult = null;
-    const sentinelEnabled = process.env.AZURE_CLIENT_ID && 
-                          process.env.AZURE_CLIENT_SECRET && 
-                          process.env.AZURE_SUBSCRIPTION_ID;
+    const sentinelEnabled = !!(tenantCtx?.tenantId && tenantCtx?.clientId && tenantCtx?.clientSecret && tenantCtx?.subscriptionId && tenantCtx?.resourceGroup && tenantCtx?.workspaceName);
     
     if (sentinelEnabled) {
 
@@ -454,10 +477,11 @@ app.post('/analyse', async (req, res) => {
         console.log('[SENTINEL] Attempting auto-assignment/update', { incidentArmId, aiSeverity });
         
         const sentinelStartTime = Date.now();
-        emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'in_progress', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Updating Sentinel incident' });
+        emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'in_progress', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Updating Sentinel incident', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
         
         // Pass AI-assessed severity to Sentinel update (owner/status taken from env)
         assignmentResult = await updateSentinelIncident(
+          tenantCtx,
           incidentArmId,
           aiSeverity,
           {
@@ -473,27 +497,27 @@ app.post('/analyse', async (req, res) => {
             incidentId: assignmentResult.incidentId,
             severity: assignmentResult.severity
           });
-          emitStage({ stage: 'SENTINEL_UPDATED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel updated', meta: { durationMs: sentinelDuration, severity: assignmentResult.severity } });
+          emitStage({ stage: 'SENTINEL_UPDATED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel updated', meta: { durationMs: sentinelDuration, severity: assignmentResult.severity, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
         } else {
           console.error(`[SENTINEL] Update failed (${sentinelDuration}ms)`, assignmentResult);
-          emitStage({ stage: 'SENTINEL_UPDATED', status: 'error', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update failed', meta: { durationMs: sentinelDuration, error: assignmentResult?.error } });
+          emitStage({ stage: 'SENTINEL_UPDATED', status: 'error', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update failed', meta: { durationMs: sentinelDuration, error: assignmentResult?.error, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
         }
       } else {
         console.log('[SENTINEL] Skipping update (no incident ARM id found)');
-        emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - no ARM id' });
+        emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - no ARM id', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
       }
     } else {
       console.log('[SENTINEL] Skipping update (config not set)');
-      emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - config missing' });
+      emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - config missing', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
     }
 
-    // Final RCA email to TOSENDERMAIL
+    // Final RCA email to tenant recipients (customerMail.toSenderMail)
     try {
-      const to = process.env.TOSENDERMAIL || process.env.SENTINEL_OWNER_EMAIL || process.env.SENDGRID_FROM_EMAIL;
+      const to = tenantCtx?.customerMail?.toSenderMail;
       const subject = `RCA Report: ${incidentRecord.type} (Severity: ${aiSeverity}) - Request ${requestId}`;
       
       console.log(`📧 [EMAIL][RCA] Preparing RCA email for request ${requestId}`, {
-        recipient: to,
+        recipients: to,
         subject: subject,
         incidentId: incidentIdentifiers.incidentId,
         requestId: requestId,
@@ -501,9 +525,9 @@ app.post('/analyse', async (req, res) => {
         aiSeverity: aiSeverity
       });
       
-      if (to) {
+      if (Array.isArray(to) && to.length > 0) {
         // Build corrected report reflecting post-assignment state and AI severity
-        const finalOwner = process.env.SENTINEL_OWNER_EMAIL || process.env.SENTINEL_OWNER_UPN || 'Unassigned';
+        const finalOwner = tenantCtx?.ownerEmail || tenantCtx?.ownerUpn || 'Unassigned';
         const correctedReport = {
           ...report,
           incidentDetails: {
@@ -525,7 +549,7 @@ app.post('/analyse', async (req, res) => {
         });
         
         const html = await generateOutlookHtmlFromRCA(correctedReport);
-        emitStage({ stage: 'RCA_EMAIL_PREPARED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA email prepared' });
+        emitStage({ stage: 'RCA_EMAIL_PREPARED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA email prepared', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
         
         console.log(`📧 [EMAIL][RCA] Sending RCA email for request ${requestId}`, { 
           to, 
@@ -537,11 +561,11 @@ app.post('/analyse', async (req, res) => {
         });
         
         await mailSender(to, subject, html);
-        emitStage({ stage: 'RCA_EMAIL_SENT', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: `RCA email sent to ${to}` });
+        emitStage({ stage: 'RCA_EMAIL_SENT', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA email sent', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
         
         emailTracker.rcaReportSent = true;
         emailTracker.totalEmailsSent++;
-        emailTracker.emailRecipients.push(to);
+        emailTracker.emailRecipients.push(...to);
         emailTracker.emailTimestamps.push(new Date().toISOString());
         
         // Update the stored incident record with final email tracking data
@@ -553,15 +577,13 @@ app.post('/analyse', async (req, res) => {
         }
         
         console.log(`✅ [EMAIL][RCA] RCA email sent successfully for request ${requestId}`, {
-          recipient: to,
+          recipients: to,
           totalEmailsSent: emailTracker.totalEmailsSent,
           timestamp: new Date().toISOString()
         });
       } else {
         console.log(`⚠️  [EMAIL][RCA] Skipped for request ${requestId} - no email recipients configured`, {
           envVars: {
-            TOSENDERMAIL: !!process.env.TOSENDERMAIL,
-            SENTINEL_OWNER_EMAIL: !!process.env.SENTINEL_OWNER_EMAIL,
             SENDGRID_FROM_EMAIL: !!process.env.SENDGRID_FROM_EMAIL
           }
         });
@@ -650,7 +672,7 @@ app.post('/analyse', async (req, res) => {
       processingTime: totalDuration
     };
     
-    emitStage({ stage: 'PIPELINE_COMPLETED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Pipeline completed', meta: { totalDuration } });
+    emitStage({ stage: 'PIPELINE_COMPLETED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Pipeline completed', meta: { totalDuration, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
     res.json(response);
   } catch (error) {
     console.error('Analysis error:', error);
@@ -676,6 +698,7 @@ app.get('/incidents', async (req, res) => {
       affectedUsers: inc.affectedUsers,
       responseTime: inc.responseTime,
       incidentNumber: inc.incidentNumber,
+      tenant: inc.tenant,
       // Include severity assessment data for the dashboard
       severityAssessment: inc.report?.severityAssessment || null
     }));
@@ -683,6 +706,16 @@ app.get('/incidents', async (req, res) => {
   } catch (error) {
     console.error('Error fetching incidents:', error);
     res.status(500).json({ error: 'Failed to fetch incidents' });
+  }
+});
+
+// Tenants endpoint for UI dropdown
+app.get('/tenants', (req, res) => {
+  try {
+    const items = listTenants();
+    res.json(items);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to list tenants' });
   }
 });
 
@@ -1226,15 +1259,24 @@ app.get('/sentinel/health', async (req, res) => {
   const startTime = Date.now();
   
   try {
+    const tenantKey = req.query?.tenantKey;
+    if (!tenantKey) {
+      return res.status(400).json({ error: 'tenantKey query param required' });
+    }
+    const tenantCtx = getTenantByKey(tenantKey);
+    if (!tenantCtx) {
+      return res.status(404).json({ error: 'Unknown tenant', tenantKey });
+    }
     if (DEBUG) {
-      console.log('🏥 Sentinel health check requested');
+      console.log('🏥 Sentinel health check requested', { tenantKey });
     }
     
-    const status = await validateSentinelConnection();
+    const status = await validateSentinelConnection(tenantCtx);
     const duration = Date.now() - startTime;
     
     if (DEBUG) {
       console.log(`✅ Sentinel health check completed (${duration}ms)`, {
+        tenantKey,
         connected: status.connected,
         hasToken: status.hasToken,
         workspace: status.configuration?.workspace,
@@ -1244,6 +1286,7 @@ app.get('/sentinel/health', async (req, res) => {
     
     res.json({
       ...status,
+      tenantKey,
       checkDuration: duration
     });
   } catch (error) {

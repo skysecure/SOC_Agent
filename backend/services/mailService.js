@@ -3,16 +3,29 @@ import sgMail from '@sendgrid/mail';
 const { SENDGRID_API_KEY, SENDGRID_FROM_EMAIL } = process.env;
 sgMail.setApiKey(SENDGRID_API_KEY);
 
+function normalizeRecipients(to) {
+  if (!to) return [];
+  if (Array.isArray(to)) return to.filter(Boolean);
+  if (typeof to === 'string') return to.split(',').map(s => s.trim()).filter(Boolean);
+  return [];
+}
+
 export const mailSender = async (to, subject, template) => {
   const emailId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const startTime = Date.now();
   
   try {
-    const msg = { to, from: SENDGRID_FROM_EMAIL, subject, html: template };
+    const recipients = normalizeRecipients(to);
+    if (recipients.length === 0) {
+      console.log(`📧 [MAIL] Skipping send - no recipients`, { emailId });
+      return { success: false, reason: 'no_recipients', emailId };
+    }
+    const msg = { to: recipients, from: SENDGRID_FROM_EMAIL, subject, html: template };
     
     console.log(`📧 [MAIL] Starting email send - ${emailId}`, {
       emailId: emailId,
-      toPreview: to ? `${to.substring(0, 3)}***` : 'MISSING',
+      toCount: recipients.length,
+      toPreview: recipients.map(r => `${r.substring(0,3)}***`).slice(0, 3),
       from: SENDGRID_FROM_EMAIL,
       subjectPreview: subject ? subject.substring(0, 60) : 'MISSING',
       htmlLength: template ? template.length : 0,
@@ -42,7 +55,7 @@ export const mailSender = async (to, subject, template) => {
     
     const errorInfo = {
       emailId: emailId,
-      toPreview: to ? `${to.substring(0, 3)}***` : 'MISSING',
+      toPreview: Array.isArray(to) ? to.slice(0,3).map(r => `${r.substring(0,3)}***`) : to ? `${to.substring(0, 3)}***` : 'MISSING',
       subjectPreview: subject ? subject.substring(0, 60) : 'MISSING',
       message: error?.message,
       code: error?.code,

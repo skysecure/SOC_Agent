@@ -81,7 +81,7 @@ function Toast({ pipeline }) {
   );
 }
 
-export default function LiveAgentFeed() {
+export default function LiveAgentFeed({ selectedTenantKey = 'ALL' }) {
   const [pipelines, setPipelines] = useState({}); // requestId -> {requestId, incidentId, events, stageState, meta}
   const [isOpen, setIsOpen] = useState(true);
   const eventSourceRef = useRef(null);
@@ -122,6 +122,12 @@ export default function LiveAgentFeed() {
 
   const items = Object.values(pipelines)
     .sort((a, b) => (b.events[b.events.length - 1]?.eventId || 0) - (a.events[a.events.length - 1]?.eventId || 0))
+    .filter(p => {
+      if (selectedTenantKey === 'ALL') return true;
+      const last = p.events[p.events.length - 1];
+      const tk = last?.tenantKey || last?.meta?.tenantKey || p.meta?.tenantKey;
+      return tk === selectedTenantKey;
+    })
     .slice(0, 5);
 
   if (!isOpen) return null;
@@ -153,9 +159,9 @@ export default function LiveAgentFeed() {
         >
           ×
         </button>
-        {items.map(p => (
-          <Toast key={p.requestId || p.incidentId} pipeline={p} />
-        ))}
+        {items.map(p => {
+          return <Toast key={p.requestId || p.incidentId} pipeline={p} />;
+        })}
       </div>
     </div>
   );

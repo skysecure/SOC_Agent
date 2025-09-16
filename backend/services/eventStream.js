@@ -70,12 +70,16 @@ export function emitStage({
   try {
     const eventId = nextEventId++;
     const ts = new Date().toISOString();
+    const tenantKey = meta?.tenantKey;
+    const subscriptionId = meta?.subscriptionId;
     const event = {
       eventId,
       stage,
       status,
       incidentId,
       requestId,
+      tenantKey,
+      subscriptionId,
       ts,
       message: String(message || ''),
       meta

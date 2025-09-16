@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { format } from 'date-fns';
@@ -115,9 +115,12 @@ function Dashboard() {
   const [showThreatIntel, setShowThreatIntel] = useState(false);
   const [chatIncident, setChatIncident] = useState(null);
   const [chatMode, setChatMode] = useState('general');
+  const [tenants, setTenants] = useState([]);
+  const [selectedTenantKey, setSelectedTenantKey] = useState('ALL');
 
   useEffect(() => {
     fetchIncidents();
+    fetchTenants();
   }, []);
 
   // Auto-show threat intelligence when incident is selected
@@ -139,52 +142,66 @@ function Dashboard() {
     }
   };
 
+  const fetchTenants = async () => {
+    try {
+      const response = await axios.get(`http://${IP}:${PORT}/tenants`);
+      setTenants([{ key: 'ALL', displayName: 'All tenants' }, ...response.data]);
+    } catch (_) {
+      setTenants([{ key: 'ALL', displayName: 'All tenants' }]);
+    }
+  };
+
+  const filteredIncidents = useMemo(() => {
+    if (selectedTenantKey === 'ALL') return incidents;
+    return incidents.filter(i => i.tenant?.key === selectedTenantKey);
+  }, [incidents, selectedTenantKey]);
+
   // Calculate metrics including both initial and AI-assessed severities
   const metrics = {
-    total: incidents.length,
+    total: filteredIncidents.length,
     // Count initial severities
-    initialHigh: incidents.filter(i => {
+    initialHigh: filteredIncidents.filter(i => {
       const initial = i.severityAssessment?.initialSeverity || i.severity;
       return initial?.toLowerCase() === 'high';
     }).length,
-    initialMedium: incidents.filter(i => {
+    initialMedium: filteredIncidents.filter(i => {
       const initial = i.severityAssessment?.initialSeverity || i.severity;
       return initial?.toLowerCase() === 'medium';
     }).length,
-    initialLow: incidents.filter(i => {
+    initialLow: filteredIncidents.filter(i => {
       const initial = i.severityAssessment?.initialSeverity || i.severity;
       return initial?.toLowerCase() === 'low';
     }).length,
-    initialInformational: incidents.filter(i => {
+    initialInformational: filteredIncidents.filter(i => {
       const initial = i.severityAssessment?.initialSeverity || i.severity;
       return initial?.toLowerCase() === 'informational';
     }).length,
     // Count AI-assessed severities
-    aiHigh: incidents.filter(i => {
+    aiHigh: filteredIncidents.filter(i => {
       const ai = i.severityAssessment?.aiAssessedSeverity || i.severity;
       return ai?.toLowerCase() === 'high';
     }).length,
-    aiMedium: incidents.filter(i => {
+    aiMedium: filteredIncidents.filter(i => {
       const ai = i.severityAssessment?.aiAssessedSeverity || i.severity;
       return ai?.toLowerCase() === 'medium';
     }).length,
-    aiLow: incidents.filter(i => {
+    aiLow: filteredIncidents.filter(i => {
       const ai = i.severityAssessment?.aiAssessedSeverity || i.severity;
       return ai?.toLowerCase() === 'low';
     }).length,
-    aiInformational: incidents.filter(i => {
+    aiInformational: filteredIncidents.filter(i => {
       const ai = i.severityAssessment?.aiAssessedSeverity || i.severity;
       return ai?.toLowerCase() === 'informational';
     }).length,
     // Legacy counts for backward compatibility
-    high: incidents.filter(i => i.severity?.toLowerCase() === 'high').length,
-    medium: incidents.filter(i => i.severity?.toLowerCase() === 'medium').length,
-    low: incidents.filter(i => i.severity?.toLowerCase() === 'low').length,
-    informational: incidents.filter(i => i.severity?.toLowerCase() === 'informational').length,
-    closed: incidents.filter(i => i.status === 'Closed').length,
-    active: incidents.filter(i => i.status === 'Active').length,
-    avgResponseTime: incidents.length > 0 
-      ? Math.round(incidents.reduce((sum, i) => sum + (i.responseTime || 0), 0) / incidents.length)
+    high: filteredIncidents.filter(i => i.severity?.toLowerCase() === 'high').length,
+    medium: filteredIncidents.filter(i => i.severity?.toLowerCase() === 'medium').length,
+    low: filteredIncidents.filter(i => i.severity?.toLowerCase() === 'low').length,
+    informational: filteredIncidents.filter(i => i.severity?.toLowerCase() === 'informational').length,
+    closed: filteredIncidents.filter(i => i.status === 'Closed').length,
+    active: filteredIncidents.filter(i => i.status === 'Active').length,
+    avgResponseTime: filteredIncidents.length > 0 
+      ? Math.round(filteredIncidents.reduce((sum, i) => sum + (i.responseTime || 0), 0) / filteredIncidents.length)
       : 0
   };
 
@@ -203,7 +220,7 @@ function Dashboard() {
 
   // Group incidents by date for trend chart
   const trendData = {};
-  incidents.forEach(incident => {
+  filteredIncidents.forEach(incident => {
     const date = format(new Date(incident.timestamp), 'MMM dd');
     trendData[date] = (trendData[date] || 0) + 1;
   });
@@ -285,6 +302,17 @@ function Dashboard() {
       <header className="dashboard-header">
         <h1>SOC Incident Dashboard</h1>
         <div className="header-actions">
+          <select
+            value={selectedTenantKey}
+            onChange={(e) => setSelectedTenantKey(e.target.value)}
+            className="nav-btn"
+            style={{ marginRight: '0.5rem' }}
+            title="Filter by tenant"
+          >
+            {tenants.map(t => (
+              <option key={t.key} value={t.key}>{t.displayName}</option>
+            ))}
+          </select>
           <button onClick={fetchIncidents} className="refresh-btn">↻ Refresh</button>
           <Link to="/" className="nav-btn">← Back to Analyzer</Link>
         </div>
@@ -419,15 +447,18 @@ function Dashboard() {
                   <th>Time</th>
                   <th>Incident #</th>
                   <th>Type</th>
+                  <th>Tenant</th>
                   <th>Severity</th>
                   <th>Status</th>
+                  <th>Owner</th>
+                  <th>Subscription</th>
                   <th>Affected Users</th>
                   <th>Summary</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {incidents.map(incident => (
+                {filteredIncidents.map(incident => (
                   <tr 
                     key={incident.id} 
                     onClick={() => setSelectedIncident(incident)} 
@@ -440,6 +471,7 @@ function Dashboard() {
                     <td>{format(new Date(incident.timestamp), 'MMM dd, HH:mm')}</td>
                     <td className="incident-number-cell">{incident.incidentNumber || 'N/A'}</td>
                     <td>{incident.type}</td>
+                    <td>{incident.tenant?.displayName || '—'}</td>
                     <td>
                       <div style={{display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start'}}>
                         <span className={`severity-badge ${getSeverityClass(incident.severityAssessment?.initialSeverity || incident.severity)}`}>
@@ -457,6 +489,8 @@ function Dashboard() {
                         {incident.status}
                       </span>
                     </td>
+                    <td>{incident.tenant?.ownerName || '—'}</td>
+                    <td>{incident.tenant?.subscriptionId || '—'}</td>
                     <td>{formatAffectedUsers(incident.affectedUsers)}</td>
                     <td className="summary-cell">{incident.executiveSummary}</td>
                     <td>
@@ -522,6 +556,11 @@ function Dashboard() {
                 <div className="loading">Loading detailed report...</div>
               ) : selectedIncidentDetails?.report ? (
                 <div className="modal-report-container">
+                  {selectedIncidentDetails?.tenant && (
+                    <div style={{ marginBottom: '1rem', fontSize: '14px', color: '#555' }}>
+                      <strong>Tenant:</strong> {selectedIncidentDetails.tenant.displayName} • <strong>Subscription:</strong> {selectedIncidentDetails.tenant.subscriptionId} • <strong>Workspace:</strong> {selectedIncidentDetails.tenant.resourceGroup}/{selectedIncidentDetails.tenant.workspaceName} • <strong>Owner:</strong> {selectedIncidentDetails.tenant.ownerName}
+                    </div>
+                  )}
                   <ReportDisplay report={selectedIncidentDetails.report} />
                 </div>
               ) : quickLookIncident ? (
@@ -534,6 +573,9 @@ function Dashboard() {
                   <p><strong>Response Time:</strong> {quickLookIncident.responseTime} minutes</p>
                   <p><strong>Affected Users:</strong> {formatAffectedUsers(quickLookIncident.affectedUsers)}</p>
                   <p><strong>Executive Summary:</strong> {quickLookIncident.executiveSummary}</p>
+                  {quickLookIncident?.tenant && (
+                    <p><strong>Tenant:</strong> {quickLookIncident.tenant.displayName} • <strong>Subscription:</strong> {quickLookIncident.tenant.subscriptionId} • <strong>Workspace:</strong> {quickLookIncident.tenant.resourceGroup}/{quickLookIncident.tenant.workspaceName} • <strong>Owner:</strong> {quickLookIncident.tenant.ownerName}</p>
+                  )}
                 </div>
               ) : null}
               <button className="close-btn" onClick={() => {
@@ -576,7 +618,7 @@ function Dashboard() {
         allIncidents={incidents}
       />
       {/* Live Agent Feed overlay (non-intrusive) */}
-      <LiveAgentFeed />
+      <LiveAgentFeed selectedTenantKey={selectedTenantKey} />
     </div>
   );
 }

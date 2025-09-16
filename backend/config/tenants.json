@@ -1,0 +1,36 @@
+[
+  {
+    "key": "sstLab",
+    "displayName": "SST Lab",
+    "tenantId": "d7ab1225-4649-4cb3-abd5-bc732bed3203",
+    "clientId": "d7190faa-b3ac-4c0d-b090-adc674b9705c",
+    "clientSecret": "kMj8Q~ECiZEve_tELf02PgNh.dy7K1O4EW8e7bHM",
+    "subscriptionId": "789ffe48-9506-43da-b629-b0b9174bad4d",
+    "resourceGroup": "SOCAutomationAgent",
+    "workspaceName": "SOCAutomation",
+    "ownerName": "Vijay Ganesh",
+    "ownerEmail": "Vijay.Ganesh@sstlab.in",
+    "ownerObjectId": "3f49ac52-8132-4f99-ae1f-052e3036e60a",
+    "ownerUpn": "Vijay.Ganesh@sstlab.in",
+    "customerMail": {
+      "toSenderMail": ["pranavvk16@gmail.com"]
+    }
+  },
+  {
+    "key": "contoso",
+    "displayName": "Contoso",
+    "tenantId": "aeeb1c5f-dbce-4c21-9bf4-e1bf47286901",
+    "clientId": "d1b34ba1-4e12-4500-8672-e7a9ea0fdc45",
+    "clientSecret": "~mq8Q~YxImDgBb9A94TTFPj_m9TL~epvUxNhmcRQ",
+    "subscriptionId": "9d3e1997-2e30-4944-98c4-c83bdded54b1",
+    "resourceGroup": "lighthousedemo",
+    "workspaceName": "SentinelTraining",
+    "ownerName": "Microsoft CDX",
+    "ownerEmail": "admin@M365x00650578.onmicrosoft.com",
+    "ownerObjectId": "771bf845-2506-4a3a-8b60-c1856716f1ea",
+    "ownerUpn": "admin@M365x00650578.onmicrosoft.com",
+    "customerMail": {
+      "toSenderMail": ["pranavvk16@gmail.com"]
+    }
+  }
+]

@@ -7,41 +7,13 @@ dotenv.config();
 // Debug mode flag
 const DEBUG = process.env.SENTINEL_DEBUG === 'true';
 
-// Validate Sentinel configuration
-const requiredSentinelVars = [
-  'AZURE_SUBSCRIPTION_ID',
-  'AZURE_RESOURCE_GROUP',
-  'AZURE_WORKSPACE_NAME',
-  'SENTINEL_OWNER_EMAIL',
-  'SENTINEL_OWNER_UPN',
-  'SENTINEL_OWNER_OBJECT_ID',
-  'SENTINEL_OWNER_NAME',
-  'AZURE_MANAGEMENT_API_URL',
-  'SENTINEL_API_VERSION'
-];
+const BASE_URL = process.env.AZURE_MANAGEMENT_API_URL;
+const API_VERSION = process.env.SENTINEL_API_VERSION;
 
-requiredSentinelVars.forEach(varName => {
-  if (!process.env[varName]) {
-    console.error(`❌ Missing required Sentinel configuration: ${varName}`);
-  } else if (DEBUG) {
-    console.log(`✅ Sentinel config ${varName} is set`);
-  }
-});
-
-if (DEBUG) {
-  console.log('🔍 Sentinel Service Debug Mode Enabled');
-  console.log('Configured Sentinel workspace:', {
-    subscription: process.env.AZURE_SUBSCRIPTION_ID ? '***' + process.env.AZURE_SUBSCRIPTION_ID.slice(-4) : 'NOT SET',
-    resourceGroup: process.env.AZURE_RESOURCE_GROUP,
-    workspace: process.env.AZURE_WORKSPACE_NAME,
-    apiVersion: process.env.SENTINEL_API_VERSION,
-    assignTo: process.env.SENTINEL_OWNER_EMAIL
-  });
-}
-
-export async function updateSentinelIncident(incidentId, severity, additionalDetails = {}) {
+export async function updateSentinelIncident(tenantCtx, incidentId, severity, additionalDetails = {}) {
   console.log('\n🚀 Starting Sentinel incident update process');
   console.log('Input parameters:', {
+    tenantKey: tenantCtx?.key,
     incidentId: incidentId,
     severity: severity,
     hasAdditionalDetails: Object.keys(additionalDetails).length > 0,
@@ -49,7 +21,7 @@ export async function updateSentinelIncident(incidentId, severity, additionalDet
   });
 
   try {
-    const token = await getAzureToken();
+    const token = await getAzureToken(tenantCtx);
     
     // Extract incident name from various ID formats
     let incidentName = incidentId;
@@ -59,7 +31,7 @@ export async function updateSentinelIncident(incidentId, severity, additionalDet
       console.log(`📝 Extracted incident name from ARM ID: ${incidentName}`);
     }
     
-    const apiUrl = buildSentinelApiUrl(incidentName);
+    const apiUrl = buildSentinelApiUrl(tenantCtx, incidentName);
 
     // Check if incident data was provided from /analyse endpoint to avoid extra API call
     let existingTitle;
@@ -105,7 +77,7 @@ export async function updateSentinelIncident(incidentId, severity, additionalDet
     const cleanedDetails = { ...additionalDetails };
     delete cleanedDetails.incidentData;
     
-    const updatePayload = buildUpdatePayload(severity, cleanedDetails, existingTitle);
+    const updatePayload = buildUpdatePayload(tenantCtx, severity, cleanedDetails, existingTitle);
 
     console.log(`🎯 Updating Sentinel incident: ${incidentName}`);
     
@@ -148,7 +120,7 @@ export async function updateSentinelIncident(incidentId, severity, additionalDet
     try {
       const commentMessage = buildIncidentComment(severity, additionalDetails);
       if (commentMessage) {
-        await addIncidentComment(incidentName, token, commentMessage);
+        await addIncidentComment(tenantCtx, incidentName, token, commentMessage);
         if (DEBUG) {
           console.log('🗒️  Added incident comment with RCA summary');
         }
@@ -162,7 +134,7 @@ export async function updateSentinelIncident(incidentId, severity, additionalDet
     return {
       success: true,
       incidentId: incidentName,
-      assignedTo: process.env.SENTINEL_OWNER_EMAIL,
+      assignedTo: tenantCtx?.ownerEmail,
       severity: updatePayload.properties.severity,
       timestamp: new Date().toISOString(),
       response: response.data,
@@ -173,9 +145,9 @@ export async function updateSentinelIncident(incidentId, severity, additionalDet
     // Handle token expiration
     if (error.response?.status === 401) {
       console.log('🔄 Token expired, clearing cache and retrying...');
-      clearTokenCache();
+      clearTokenCache(tenantCtx);
       // Retry once with fresh token
-      return updateSentinelIncident(incidentId, severity, additionalDetails);
+      return updateSentinelIncident(tenantCtx, incidentId, severity, additionalDetails);
     }
     
     console.error('❌ Sentinel update failed');
@@ -222,31 +194,26 @@ export async function updateSentinelIncident(incidentId, severity, additionalDet
   }
 }
 
-function buildSentinelApiUrl(incidentName) {
-  const baseUrl = process.env.AZURE_MANAGEMENT_API_URL;
-  const subscription = process.env.AZURE_SUBSCRIPTION_ID;
-  const resourceGroup = process.env.AZURE_RESOURCE_GROUP;
-  const workspace = process.env.AZURE_WORKSPACE_NAME;
-  const apiVersion = process.env.SENTINEL_API_VERSION;
-  
-  const url = `${baseUrl}/subscriptions/${subscription}/resourceGroups/${resourceGroup}/providers/Microsoft.OperationalInsights/workspaces/${workspace}/providers/Microsoft.SecurityInsights/incidents/${incidentName}?api-version=${apiVersion}`;
-  
+function buildSentinelApiUrl(tenantCtx, incidentName) {
+  const subscription = tenantCtx.subscriptionId;
+  const resourceGroup = tenantCtx.resourceGroup;
+  const workspace = tenantCtx.workspaceName;
+  const url = `${BASE_URL}/subscriptions/${subscription}/resourceGroups/${resourceGroup}/providers/Microsoft.OperationalInsights/workspaces/${workspace}/providers/Microsoft.SecurityInsights/incidents/${incidentName}?api-version=${API_VERSION}`;
   if (DEBUG) {
     console.log('🔗 Built Sentinel API URL:', {
-      baseUrl,
-      subscription: subscription ? '***' + subscription.slice(-4) : 'NOT SET',
+      tenantKey: tenantCtx?.key,
+      subscription: subscription ? '***' + String(subscription).slice(-4) : 'NOT SET',
       resourceGroup,
       workspace,
       incidentName,
-      apiVersion,
+      apiVersion: API_VERSION,
       fullUrl: url
     });
   }
-  
   return url;
 }
 
-function buildUpdatePayload(severity, additionalDetails, existingTitle) {
+function buildUpdatePayload(tenantCtx, severity, additionalDetails, existingTitle) {
   const normalizedSeverity = normalizeSeverityForSentinel(severity);
   
   // Determine safe, non-empty title (prefer explicit values, ignore empty/whitespace)
@@ -276,10 +243,10 @@ function buildUpdatePayload(severity, additionalDetails, existingTitle) {
       severity: normalizedSeverity,
       status: 'Active',
       owner: {
-        objectId: process.env.SENTINEL_OWNER_OBJECT_ID,
-        email: process.env.SENTINEL_OWNER_EMAIL,
-        userPrincipalName: process.env.SENTINEL_OWNER_UPN,
-        assignedTo: process.env.SENTINEL_OWNER_NAME
+        objectId: tenantCtx?.ownerObjectId,
+        email: tenantCtx?.ownerEmail,
+        userPrincipalName: tenantCtx?.ownerUpn,
+        assignedTo: tenantCtx?.ownerName
       }
     }
   };
@@ -329,16 +296,12 @@ function buildIncidentComment(severity, additionalDetails) {
   return message.trim().length > 0 ? message : null;
 }
 
-async function addIncidentComment(incidentName, token, message) {
-  const baseUrl = process.env.AZURE_MANAGEMENT_API_URL;
-  const subscription = process.env.AZURE_SUBSCRIPTION_ID;
-  const resourceGroup = process.env.AZURE_RESOURCE_GROUP;
-  const workspace = process.env.AZURE_WORKSPACE_NAME;
-  const apiVersion = process.env.SENTINEL_API_VERSION;
-
-  // Use PUT with a generated comment ID per Sentinel API
+async function addIncidentComment(tenantCtx, incidentName, token, message) {
+  const subscription = tenantCtx.subscriptionId;
+  const resourceGroup = tenantCtx.resourceGroup;
+  const workspace = tenantCtx.workspaceName;
   const commentId = `auto-${Date.now()}`;
-  const commentsUrl = `${baseUrl}/subscriptions/${subscription}/resourceGroups/${resourceGroup}/providers/Microsoft.OperationalInsights/workspaces/${workspace}/providers/Microsoft.SecurityInsights/incidents/${incidentName}/comments/${commentId}?api-version=${apiVersion}`;
+  const commentsUrl = `${BASE_URL}/subscriptions/${subscription}/resourceGroups/${resourceGroup}/providers/Microsoft.OperationalInsights/workspaces/${workspace}/providers/Microsoft.SecurityInsights/incidents/${incidentName}/comments/${commentId}?api-version=${API_VERSION}`;
 
   await axios.put(commentsUrl, { properties: { message: message } }, {
     headers: {
@@ -371,18 +334,18 @@ function normalizeSeverityForSentinel(severity) {
   return normalized;
 }
 
-// Export helper to validate Sentinel connectivity
-export async function validateSentinelConnection() {
+// Export helper to validate Sentinel connectivity for a tenant
+export async function validateSentinelConnection(tenantCtx) {
   try {
-    const token = await getAzureToken();
+    const token = await getAzureToken(tenantCtx);
     return {
       connected: true,
       hasToken: !!token,
       configuration: {
-        subscription: process.env.AZURE_SUBSCRIPTION_ID,
-        resourceGroup: process.env.AZURE_RESOURCE_GROUP,
-        workspace: process.env.AZURE_WORKSPACE_NAME,
-        assignee: process.env.SENTINEL_OWNER_EMAIL
+        subscription: tenantCtx?.subscriptionId,
+        resourceGroup: tenantCtx?.resourceGroup,
+        workspace: tenantCtx?.workspaceName,
+        assignee: tenantCtx?.ownerEmail
       }
     };
   } catch (error) {

@@ -1,20 +1,174 @@
 {
-  "timestamp": "2024-01-15T14:23:00Z",
-  "type": "Unauthorized Access Attempt",
-  "source_ip": "192.168.1.100",
-  "target_system": "Database Server DB-PROD-01",
-  "affected_systems": ["DB-PROD-01", "APP-SERVER-03"],
-  "alert_details": {
-    "alert_id": "SEC-2024-0115-001",
-    "detection_method": "IDS Alert",
-    "alert_severity": "High"
-  },
-  "attack_details": {
-    "attack_vector": "SQL Injection",
-    "payload": "1' OR '1'='1",
-    "attempts": 47,
-    "successful_attempts": 0
-  },
-  "user_account": "webapp_service",
-  "description": "Multiple SQL injection attempts detected targeting production database. All attempts were blocked by WAF, but pattern suggests automated attack tool usage."
+  "id": "/subscriptions/9d3e1997-2e30-4944-98c4-c83bdded54b1/resourceGroups/lighthousedemo/providers/Microsoft.OperationalInsights/workspaces/sentineltraining/providers/Microsoft.SecurityInsights/Incidents/9c089d8f-86d2-49ac-8d50-afa64e4781f7",
+  "name": "9c089d8f-86d2-49ac-8d50-afa64e4781f7",
+  "etag": "\"2a00cce7-0000-2000-0000-68c918d60000\"",
+  "type": "Microsoft.SecurityInsights/Incidents",
+  "properties": {
+    "title": "Suspicious Resource deployment involving one user",
+    "severity": "Low",
+    "status": "New",
+    "owner": {
+      "objectId": null,
+      "email": null,
+      "assignedTo": null,
+      "userPrincipalName": null
+    },
+    "labels": [],
+    "firstActivityTimeUtc": "2025-09-15T11:56:44.7832112Z",
+    "lastActivityTimeUtc": "2025-09-16T07:46:44.7832112Z",
+    "lastModifiedTimeUtc": "2025-09-16T07:59:18.2873094Z",
+    "createdTimeUtc": "2025-09-15T12:07:01.8666667Z",
+    "incidentNumber": 2,
+    "additionalData": {
+      "alertsCount": 2,
+      "bookmarksCount": 0,
+      "commentsCount": 0,
+      "alertProductNames": [
+        "Azure Sentinel"
+      ],
+      "tactics": [
+        "Impact"
+      ],
+      "techniques": [
+        "T1496"
+      ]
+    },
+    "relatedAnalyticRuleIds": [
+      "/subscriptions/9d3e1997-2e30-4944-98c4-c83bdded54b1/resourceGroups/lighthousedemo/providers/Microsoft.OperationalInsights/workspaces/sentineltraining/providers/Microsoft.SecurityInsights/alertRules/2f813e77-fa3b-40da-abdb-601e8923e289"
+    ],
+    "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/Incident/subscriptions/9d3e1997-2e30-4944-98c4-c83bdded54b1/resourceGroups/lighthousedemo/providers/Microsoft.OperationalInsights/workspaces/sentineltraining/providers/Microsoft.SecurityInsights/Incidents/9c089d8f-86d2-49ac-8d50-afa64e4781f7",
+    "providerName": "Microsoft XDR",
+    "providerIncidentId": "1",
+    "alerts": [
+      {
+        "id": "/subscriptions/9d3e1997-2e30-4944-98c4-c83bdded54b1/resourceGroups/lighthousedemo/providers/Microsoft.OperationalInsights/workspaces/sentineltraining/providers/Microsoft.SecurityInsights/Entities/f0ffcdab-7643-6ad1-c8e2-8132783a7501",
+        "name": "f0ffcdab-7643-6ad1-c8e2-8132783a7501",
+        "type": "Microsoft.SecurityInsights/Entities",
+        "kind": "SecurityAlert",
+        "properties": {
+          "systemAlertId": "f0ffcdab-7643-6ad1-c8e2-8132783a7501",
+          "tactics": [
+            "Impact"
+          ],
+          "alertDisplayName": "Suspicious Resource deployment",
+          "description": "Identifies when a rare Resource and ResourceGroup deployment occurs by a previously unseen caller.",
+          "confidenceLevel": "Unknown",
+          "severity": "Low",
+          "vendorName": "Microsoft",
+          "productName": "Azure Sentinel",
+          "productComponentName": "Scheduled Alerts",
+          "alertType": "dffd610d-08df-4c77-b21e-31ce73292e5d_2f813e77-fa3b-40da-abdb-601e8923e289",
+          "processingEndTime": "2025-09-16T07:51:49.7014285Z",
+          "status": "New",
+          "endTimeUtc": "2025-09-16T07:46:44.7832112Z",
+          "startTimeUtc": "2025-09-16T07:41:44.7832112Z",
+          "timeGenerated": "2025-09-16T07:51:49.7780205Z",
+          "providerAlertId": "0d2e4cc3-aac0-4004-9968-21a5390782a8",
+          "resourceIdentifiers": [
+            {
+              "type": "LogAnalytics",
+              "workspaceId": "dffd610d-08df-4c77-b21e-31ce73292e5d"
+            }
+          ],
+          "additionalData": {
+            "ProcessedBySentinel": "True",
+            "Alert generation status": "Full alert created",
+            "AutomationEntityCount": "2",
+            "Query Period": "00:05:00",
+            "Trigger Operator": "GreaterThan",
+            "Trigger Threshold": "0",
+            "Correlation Id": "228f2365-b5a2-4249-982e-26713cdd86f0",
+            "Search Query Results Overall Count": "1",
+            "Data Sources": "[\"sentineltraining\"]",
+            "Query": "// The query_now parameter represents the time (in UTC) at which the scheduled analytics rule ran to produce this alert.\nset query_now = datetime(2025-09-16T07:46:44.7832112Z);\n// Add or remove operation names below as per your requirements. For operations lists, please refer to https://learn.microsoft.com/en-us/Azure/role-based-access-control/resource-provider-operations#all\nlet szOperationNames = dynamic([\"Microsoft.Compute/virtualMachines/write\", \"Microsoft.Resources/deployments/write\", \"Microsoft.Resources/subscriptions/resourceGroups/write\"]);\nlet starttime = 14d;\nlet endtime = 1d;\nlet RareCaller = AzureActivity\n| where TimeGenerated between (ago(starttime) .. ago(endtime))\n| where OperationNameValue in~ (szOperationNames)\n| summarize count() by CallerIpAddress, Caller, OperationNameValue, bin(TimeGenerated,1d)\n// Returns all the records from the right side that don't have matches from the left.\n| join kind=rightantisemi (\nAzureActivity\n| where TimeGenerated > ago(endtime)\n| where OperationNameValue in~ (szOperationNames)\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), ActivityTimeStamp = make_set(TimeGenerated,100), ActivityStatusValue = make_set(ActivityStatusValue,100), CorrelationIds = make_set(CorrelationId,100), ResourceGroups = make_set(ResourceGroup,100), ResourceIds = make_set(_ResourceId,100), ActivityCountByCallerIPAddress = count()\nby CallerIpAddress, Caller, OperationNameValue) on CallerIpAddress, Caller, OperationNameValue;\nRareCaller\n| extend Name = iif(Caller has '@',tostring(split(Caller,'@',0)[0]),\"\")\n| extend UPNSuffix = iif(Caller has '@',tostring(split(Caller,'@',1)[0]),\"\")\n| extend AadUserId = iif(Caller !has '@',Caller,\"\")",
+            "Query Start Time UTC": "2025-09-16T07:41:44Z",
+            "Query End Time UTC": "2025-09-16T07:46:45Z",
+            "Analytic Rule Ids": "[\"2f813e77-fa3b-40da-abdb-601e8923e289\"]",
+            "Event Grouping": "SingleAlert",
+            "Analytic Rule Name": "Suspicious Resource deployment",
+            "Analytics Template Id": "9fb57e58-3ed8-4b89-afcf-c8e786508b1c"
+          },
+          "friendlyName": "Suspicious Resource deployment"
+        }
+      },
+      {
+        "id": "/subscriptions/9d3e1997-2e30-4944-98c4-c83bdded54b1/resourceGroups/lighthousedemo/providers/Microsoft.OperationalInsights/workspaces/sentineltraining/providers/Microsoft.SecurityInsights/Entities/3d9de60e-dafa-0bad-f8a2-cd28670e50ca",
+        "name": "3d9de60e-dafa-0bad-f8a2-cd28670e50ca",
+        "type": "Microsoft.SecurityInsights/Entities",
+        "kind": "SecurityAlert",
+        "properties": {
+          "systemAlertId": "3d9de60e-dafa-0bad-f8a2-cd28670e50ca",
+          "tactics": [
+            "Impact"
+          ],
+          "alertDisplayName": "Suspicious Resource deployment",
+          "description": "Identifies when a rare Resource and ResourceGroup deployment occurs by a previously unseen caller.",
+          "confidenceLevel": "Unknown",
+          "severity": "Low",
+          "vendorName": "Microsoft",
+          "productName": "Azure Sentinel",
+          "productComponentName": "Scheduled Alerts",
+          "alertType": "dffd610d-08df-4c77-b21e-31ce73292e5d_2f813e77-fa3b-40da-abdb-601e8923e289",
+          "processingEndTime": "2025-09-15T12:06:49.7479288Z",
+          "status": "New",
+          "endTimeUtc": "2025-09-15T12:01:44.7832112Z",
+          "startTimeUtc": "2025-09-15T11:56:44.7832112Z",
+          "timeGenerated": "2025-09-15T12:06:49.9089124Z",
+          "providerAlertId": "58731e81-744a-4cff-a715-911bff4e5871",
+          "resourceIdentifiers": [
+            {
+              "type": "LogAnalytics",
+              "workspaceId": "dffd610d-08df-4c77-b21e-31ce73292e5d"
+            }
+          ],
+          "additionalData": {
+            "ProcessedBySentinel": "True",
+            "Alert generation status": "Full alert created",
+            "AutomationEntityCount": "2",
+            "Query Period": "00:05:00",
+            "Trigger Operator": "GreaterThan",
+            "Trigger Threshold": "0",
+            "Correlation Id": "e39af75b-dd79-420c-9708-6337d60e2ff1",
+            "Search Query Results Overall Count": "2",
+            "Data Sources": "[\"sentineltraining\"]",
+            "Query": "// The query_now parameter represents the time (in UTC) at which the scheduled analytics rule ran to produce this alert.\nset query_now = datetime(2025-09-15T12:01:44.7832112Z);\n// Add or remove operation names below as per your requirements. For operations lists, please refer to https://learn.microsoft.com/en-us/Azure/role-based-access-control/resource-provider-operations#all\nlet szOperationNames = dynamic([\"Microsoft.Compute/virtualMachines/write\", \"Microsoft.Resources/deployments/write\", \"Microsoft.Resources/subscriptions/resourceGroups/write\"]);\nlet starttime = 14d;\nlet endtime = 1d;\nlet RareCaller = AzureActivity\n| where TimeGenerated between (ago(starttime) .. ago(endtime))\n| where OperationNameValue in~ (szOperationNames)\n| summarize count() by CallerIpAddress, Caller, OperationNameValue, bin(TimeGenerated,1d)\n// Returns all the records from the right side that don't have matches from the left.\n| join kind=rightantisemi (\nAzureActivity\n| where TimeGenerated > ago(endtime)\n| where OperationNameValue in~ (szOperationNames)\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), ActivityTimeStamp = make_set(TimeGenerated,100), ActivityStatusValue = make_set(ActivityStatusValue,100), CorrelationIds = make_set(CorrelationId,100), ResourceGroups = make_set(ResourceGroup,100), ResourceIds = make_set(_ResourceId,100), ActivityCountByCallerIPAddress = count()\nby CallerIpAddress, Caller, OperationNameValue) on CallerIpAddress, Caller, OperationNameValue;\nRareCaller\n| extend Name = iif(Caller has '@',tostring(split(Caller,'@',0)[0]),\"\")\n| extend UPNSuffix = iif(Caller has '@',tostring(split(Caller,'@',1)[0]),\"\")\n| extend AadUserId = iif(Caller !has '@',Caller,\"\")",
+            "Query Start Time UTC": "2025-09-15T11:56:44Z",
+            "Query End Time UTC": "2025-09-15T12:01:45Z",
+            "Analytic Rule Ids": "[\"2f813e77-fa3b-40da-abdb-601e8923e289\"]",
+            "Event Grouping": "SingleAlert",
+            "Analytic Rule Name": "Suspicious Resource deployment",
+            "Analytics Template Id": "9fb57e58-3ed8-4b89-afcf-c8e786508b1c"
+          },
+          "friendlyName": "Suspicious Resource deployment"
+        }
+      }
+    ],
+    "bookmarks": [],
+    "relatedEntities": [
+      {
+        "id": "/subscriptions/9d3e1997-2e30-4944-98c4-c83bdded54b1/resourceGroups/lighthousedemo/providers/Microsoft.OperationalInsights/workspaces/sentineltraining/providers/Microsoft.SecurityInsights/Entities/ac160984-f9a8-5f50-d8b2-706f368f6831",
+        "name": "ac160984-f9a8-5f50-d8b2-706f368f6831",
+        "type": "Microsoft.SecurityInsights/Entities",
+        "kind": "Ip",
+        "properties": {
+          "address": "106.51.79.93",
+          "friendlyName": "106.51.79.93"
+        }
+      },
+      {
+        "id": "/subscriptions/9d3e1997-2e30-4944-98c4-c83bdded54b1/resourceGroups/lighthousedemo/providers/Microsoft.OperationalInsights/workspaces/sentineltraining/providers/Microsoft.SecurityInsights/Entities/8f35abd1-2efe-76b8-6061-68c8d036c616",
+        "name": "8f35abd1-2efe-76b8-6061-68c8d036c616",
+        "type": "Microsoft.SecurityInsights/Entities",
+        "kind": "Account",
+        "properties": {
+          "accountName": "admin",
+          "upnSuffix": "M365x00650578.onmicrosoft.com",
+          "isDomainJoined": true,
+          "displayName": "admin@M365x00650578.onmicrosoft.com",
+          "friendlyName": "admin@M365x00650578.onmicrosoft.com"
+        }
+      }
+    ],
+    "comments": []
+  }
 }
