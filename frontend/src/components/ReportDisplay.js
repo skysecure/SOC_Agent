@@ -170,7 +170,8 @@ function ReportDisplay({ report }) {
     if (severity === 'critical') return 'severity-critical';
     if (severity === 'high') return 'severity-high';
     if (severity === 'medium') return 'severity-medium';
-    return 'severity-low';
+    if (severity === 'low' || severity === 'informational') return 'severity-low';
+    return 'severity-medium'; // default for unknown severities
   };
 
   // Quick overview values
@@ -243,32 +244,38 @@ function ReportDisplay({ report }) {
     return typeof count === 'number' && count > 0 ? `${base} (${count})` : base;
   };
 
+  console.log()
   return (
     <div className={`report-content modern-report`}>
       {/* Sticky Header (Overview + Navigator) */}
       <div ref={stickyRef} className="report-sticky-header">
         <div className={`overview-bar ${isScrolled ? 'scrolled' : ''}`}>
           <div className="overview-item">
-          <span className="overview-label">Initial Severity</span>
-          <span className={`severity-badge ${getSeverityClass(initialSeverity)}`}>{initialSeverity || '—'}</span>
+            <span className="overview-label">Initial</span>
+            <span className={`severity-badge outlined ${getSeverityClass(initialSeverity)}`}>
+              {initialSeverity || 'N/A'}
+            </span>
           </div>
           <div className="overview-item">
-          <span className="overview-label">AI Severity</span>
-          <span className={`severity-badge ${getSeverityClass(aiSeverity)}`}>{aiSeverity || '—'}</span>
+            <span className="overview-label">AI Assessment</span>
+            <span className={`severity-badge ${getSeverityClass(aiSeverity)}`}>
+              {aiSeverity || 'Pending'}
+            </span>
           </div>
-          {verdictText && (
-            <div className="overview-item">
-              <span className="overview-label">Verdict</span>
-              <span className={`verdict-chip ${verdictText.toLowerCase().includes('false') ? 'false' : verdictText.toLowerCase().includes('true') ? 'true' : 'maybe'}`}>{verdictText}</span>
-            </div>
-          )}
+          {aiSeverity !== initialSeverity ? 
+                    <div className="severity-change-indicator modified">
+                      ⚠️ Modified
+                    </div>
+                  :  <div className="severity-change-indicator unchanged">
+                      ✓ Unchanged
+                  </div>}
           <div className="overview-spacer" />
           <div className="overview-actions">
             <button className="toolbar-btn" onClick={() => setAllOpen(true)}>Expand all</button>
             <button className="toolbar-btn" onClick={() => setAllOpen(false)}>Collapse all</button>
             <label className="compact-toggle" title="Show only critical sections">
               <input type="checkbox" checked={criticalOnly} onChange={(e) => setCriticalOnly(e.target.checked)} />
-              <span>Critical only</span>
+              <span>{criticalOnly ? '🔍 Critical' : '📋 All Sections'}</span>
             </label>
           </div>
         </div>
@@ -326,30 +333,27 @@ function ReportDisplay({ report }) {
                 <button className="toggle-btn" aria-label="toggle section">{getOpen(key) ? '−' : '+'}</button>
               </div>
               <div className={`section-body ${getOpen(key) ? 'open' : ''}`}>
-              <div className="severity-comparison">
-                <div className="severity-item">
-                  <span className="severity-label">Initial Severity:</span>
-                  <div className={`severity-badge ${getSeverityClass(value.initialSeverity)}`}>
-                    {value.initialSeverity}
+                <div className="severity-comparison">
+                  <div className="severity-item">
+                    <span className="severity-label">Initial</span>
+                    <div className={`severity-badge outlined ${getSeverityClass(value.initialSeverity)}`}>
+                      {value.initialSeverity || 'Unknown'}
+                    </div>
+                  </div>
+                  <div className="severity-arrow">➜</div>
+                  <div className="severity-item">
+                    <span className="severity-label">AI Assessment</span>
+                    <div className={`severity-badge ${getSeverityClass(value.aiAssessedSeverity)}`}>
+                      {value.aiAssessedSeverity || 'Analyzing'}
+                    </div>
                   </div>
                 </div>
-                <div className="severity-arrow">→</div>
-                <div className="severity-item">
-                  <span className="severity-label">AI-Assessed Severity:</span>
-                  <div className={`severity-badge ${getSeverityClass(value.aiAssessedSeverity)}`}>
-                    {value.aiAssessedSeverity}
+                {value.justification && (
+                  <div className="severity-justification">
+                    <strong>🎯 Assessment Rationale:</strong> {value.justification}
                   </div>
-                </div>
-                {!severityMatch && (
-                  <div className="severity-change-indicator">Changed</div>
                 )}
               </div>
-              </div>
-              {getOpen(key) && value.justification && (
-                <div className="severity-justification">
-                  <strong>Assessment Rationale:</strong> {value.justification}
-                </div>
-              )}
             </section>
           );
         }
@@ -363,31 +367,31 @@ function ReportDisplay({ report }) {
                 <button className="toggle-btn" aria-label="toggle section">{getOpen(key) ? '−' : '+'}</button>
               </div>
               <div className={`section-body ${getOpen(key) ? 'open' : ''}`}>
-              <div className={`assignment-result ${value.success ? 'success' : 'error'}`}>
-                {value.success ? (
-                  <>
-                    <div className="status-icon">✅</div>
-                    <div className="assignment-details">
-                      <p><strong>Status:</strong> Successfully assigned</p>
-                      <p><strong>Assigned to:</strong> {value.assignedTo}</p>
-                      <p><strong>Severity updated to:</strong> {value.severity}</p>
-                      <p><strong>Incident ID:</strong> {value.incidentId}</p>
-                      <p><strong>Timestamp:</strong> {new Date(value.timestamp).toLocaleString()}</p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="status-icon">❌</div>
-                    <div className="assignment-details">
-                      <p><strong>Status:</strong> Assignment failed</p>
-                      <p><strong>Error:</strong> {value.error}</p>
-                      {value.status === 404 && (
-                        <p className="error-hint">Incident not found in Sentinel. Verify the incident ID.</p>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
+                <div className={`assignment-result ${value.success ? 'success' : 'error'}`}>
+                  {value.success ? (
+                    <>
+                      <div className="status-icon">✅</div>
+                      <div className="assignment-details">
+                        <p><strong>📋 Status:</strong> Successfully assigned</p>
+                        <p><strong>👤 Assigned to:</strong> {value.assignedTo}</p>
+                        <p><strong>⚡ Severity:</strong> <span className={`severity-badge ${getSeverityClass(value.severity)}`}>{value.severity}</span></p>
+                        <p><strong>🆔 Incident ID:</strong> <code>{value.incidentId}</code></p>
+                        <p><strong>🕒 Timestamp:</strong> {new Date(value.timestamp).toLocaleString()}</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="status-icon">❌</div>
+                      <div className="assignment-details">
+                        <p><strong>⚠️ Status:</strong> Assignment failed</p>
+                        <p><strong>❗ Error:</strong> {value.error}</p>
+                        {value.status === 404 && (
+                          <p className="error-hint">💡 Incident not found in Sentinel. Please verify the incident ID.</p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </section>
           );
@@ -405,13 +409,18 @@ function ReportDisplay({ report }) {
                 <button className="toggle-btn" aria-label="toggle section">{getOpen(key) ? '−' : '+'}</button>
               </div>
               <div className={`section-body ${getOpen(key) ? 'open' : ''}`}>
-                <div className={`verdict-badge ${verdictClass}`}>{value}</div>
-              </div>
-              {getOpen(key) && report.verdictRationale && (
-                <div className="verdict-rationale">
-                  <strong>Rationale:</strong> {report.verdictRationale}
+                <div className={`verdict-badge ${verdictClass}`}>
+                  {value.toLowerCase().includes('false') && '🛡️ '}
+                  {value.toLowerCase().includes('true') && '⚠️ '}
+                  {!value.toLowerCase().includes('false') && !value.toLowerCase().includes('true') && '❓ '}
+                  {value}
                 </div>
-              )}
+                {report.verdictRationale && (
+                  <div className="verdict-rationale">
+                    <strong>📝 Rationale:</strong> {report.verdictRationale}
+                  </div>
+                )}
+              </div>
             </section>
           );
         }

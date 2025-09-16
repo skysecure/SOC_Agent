@@ -296,6 +296,12 @@
   transition: all 0.2s ease;
 }
 
+/* Outlined variant for initial severity */
+.severity-badge.outlined {
+  background-color: rgb(0, 0, 0);
+  border: 1px solid currentColor;
+}
+
 .severity-high {
   background: #fee2e2;
   color: #dc2626;
@@ -319,6 +325,12 @@
 .severity-unknown {
   background: #f3f4f6;
   color: #6b7280;
+}
+
+/* Add critical class for completeness in dashboard context */
+.severity-critical {
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 /* Status Badges */
@@ -348,6 +360,60 @@
   color: #dc2626;
 }
 
+/* Modern compact badges for tenant/owner/users */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.3rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+
+.badge::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+.badge-tenant {
+  background: #eef2ff;
+  color: #3730a3;
+  border-color: #e0e7ff;
+}
+
+.badge-owner {
+  background: #ecfeff;
+  color: #155e75;
+  border-color: #cffafe;
+}
+
+.badge-users {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+/* Active/Closed variants to ensure consistency */
+.status-active {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.status-closed {
+  background: #dcfce7;
+  color: #166534;
+}
+
 /* Summary Cell */
 .summary-cell {
   max-width: 300px;
@@ -357,60 +423,94 @@
   color: #4b5563;
 }
 
+/* Clamp multi-line long text for the Type column */
+.type-cell {
+  max-width: 340px;
+  color: #1f2937;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.35;
+}
+
 /* View Button */
 .view-btn {
-  background: #2563eb;
+  background: linear-gradient(135deg, #2563eb, #1e40af);
   color: white;
   border: none;
-  padding: 0.4rem 0.8rem;
-  border-radius: 6px;
+  padding: 0.5rem 0.9rem;
+  border-radius: 9999px;
   cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 500;
+  font-size: 0.82rem;
+  font-weight: 600;
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  box-shadow: 0 2px 8px rgba(37,99,235,0.25);
 }
 
 .view-btn:hover {
-  background: #1d4ed8;
-  transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(37,99,235,0.3);
+  filter: brightness(1.03);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(37,99,235,0.35);
 }
 
 .view-btn:active {
-  transform: scale(0.95);
+  transform: translateY(0);
+}
+
+.view-btn:focus-visible {
+  outline: 3px solid rgba(59,130,246,0.5);
+  outline-offset: 2px;
+}
+
+.btn-icon {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+}
+
+.btn-icon svg { width: 18px; height: 18px; }
+
+/* Icon-only variant */
+.icon-only {
+  padding: 0.5rem;
+  width: 36px;
+  height: 36px;
+  justify-content: center;
 }
 
 /* Quick Look Button */
 .quick-look-btn {
-  background: #3b82f6;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
   transition: all 0.2s ease;
 }
 
 .quick-look-btn:hover {
-  background: #2563eb;
-  box-shadow: 0 2px 8px rgba(59,130,246,0.3);
+  box-shadow: 0 8px 20px rgba(59,130,246,0.35);
 }
 
 /* Detailed View Button */
 .detailed-view-btn {
-  background: #10b981;
+  background: linear-gradient(135deg, #10b981, #059669);
   transition: all 0.2s ease;
 }
 
 .detailed-view-btn:hover {
-  background: #059669;
-  box-shadow: 0 2px 8px rgba(16,185,129,0.3);
+  box-shadow: 0 8px 20px rgba(16,185,129,0.35);
 }
 
 /* AI Chat Button */
 .ai-chat-btn {
-  background: #8b5cf6;
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
   transition: all 0.2s ease;
 }
 
 .ai-chat-btn:hover {
-  background: #7c3aed;
-  box-shadow: 0 2px 8px rgba(139,92,246,0.3);
+  box-shadow: 0 8px 20px rgba(139,92,246,0.35);
 }
 
 /* Modal with Animations */
@@ -474,6 +574,98 @@
 .incident-details strong {
   color: #1f2937;
   font-weight: 600;
+}
+
+/* QuickLook modern card */
+.quicklook-card {
+  position: relative;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+
+.quicklook-card .accent-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 4px;
+  width: 100%;
+  background: linear-gradient(90deg, #3b82f6, #10b981);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+.quicklook-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.ql-title { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.ql-type {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  max-width: 520px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.incident-number-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1e3a8a;
+  background: #e0e7ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 9999px;
+}
+
+.ql-severity { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.badge-time {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #dbeafe;
+}
+
+.icon-inline { width: 14px; height: 14px; margin-right: 6px; }
+
+.summary-box {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.summary-text {
+  color: #374151;
+  line-height: 1.5;
+}
+
+.tenant-footnote {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: #6b7280;
 }
 
 .close-btn {

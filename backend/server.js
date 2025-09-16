@@ -193,6 +193,32 @@ function calculateResponseTime(incidentData) {
   }
 }
 
+// Helper: normalize identifiers from incident data
+function normalizeIncidentIdentifiers(incidentData) {
+  try {
+    const armId = incidentData?.id || null;
+
+    // Prefer explicit name field. If missing, try to extract from ARM id
+    let internalId = incidentData?.name || null;
+    if (!internalId && typeof armId === 'string') {
+      const match = armId.match(/\/Incidents\/([^/]+)$/i);
+      internalId = match ? match[1] : (armId.split('/').filter(Boolean).pop() || null);
+    }
+
+    // Coerce incidentNumber to a number when possible
+    const rawIncidentNumber = incidentData?.properties?.incidentNumber;
+    const incidentNumber = typeof rawIncidentNumber === 'number'
+      ? rawIncidentNumber
+      : (typeof rawIncidentNumber === 'string'
+        ? (Number.isNaN(parseInt(rawIncidentNumber, 10)) ? null : parseInt(rawIncidentNumber, 10))
+        : null);
+
+    return { internalId: internalId || 'unknown', armId, incidentNumber };
+  } catch (_) {
+    return { internalId: 'unknown', armId: null, incidentNumber: null };
+  }
+}
+
 app.post('/analyse', async (req, res) => {
   try {
     // ===== COMPREHENSIVE LOGGING START =====
@@ -210,12 +236,15 @@ app.post('/analyse', async (req, res) => {
     
     const incidentData = (req?.body?.body?.object) ? req.body?.body?.object : req.body;
 
+    // Extract normalized identifiers first
+    const { internalId, armId, incidentNumber } = normalizeIncidentIdentifiers(incidentData);
+
     // Extract unique identifiers for deduplication tracking
     const incidentIdentifiers = {
       requestId: requestId,
       timestamp: new Date().toISOString(),
-      // Try multiple possible incident ID locations
-      incidentId: incidentData?.id || incidentData?.properties?.id || incidentData?.name || incidentData?.properties?.incidentNumber || incidentData?.properties?.providerIncidentId || 'unknown',
+      // Use canonical internal id (Sentinel incident name)
+      incidentId: internalId,
       title: incidentData?.properties?.title || incidentData?.properties?.alertDisplayName || 'unknown',
       createdTime: incidentData?.properties?.createdTimeUtc || incidentData?.createdTimeUtc || 'unknown',
       // Hash the incident data for duplicate detection
@@ -233,7 +262,7 @@ app.post('/analyse', async (req, res) => {
     console.log(`🔍 [ANALYSE] Incident Identifiers:`, incidentIdentifiers);
     
     // Resolve tenant context from subscriptionId in ARM path (id or name)
-    const armIdSource = incidentData?.id || incidentData?.name || '';
+    const armIdSource = armId || incidentData?.name || '';
     const resolvedSubscriptionId = extractSubscriptionIdFromArmId(armIdSource);
     const tenantCtx = resolvedSubscriptionId ? getTenantBySubscriptionId(resolvedSubscriptionId) : null;
 
@@ -261,7 +290,7 @@ app.post('/analyse', async (req, res) => {
       requestId, 
       incidentId: incidentIdentifiers.incidentId,
       message: 'Analysis request received',
-      meta: { incidentNumber: incidentIdentifiers.incidentId, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId }
+      meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId }
     });
     emitStage({ 
       stage: 'PIPELINE_STARTED', 
@@ -269,7 +298,7 @@ app.post('/analyse', async (req, res) => {
       requestId,
       incidentId: incidentIdentifiers.incidentId,
       message: 'Pipeline initiated',
-      meta: { incidentNumber: incidentIdentifiers.incidentId, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId }
+      meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId }
     });
     console.log(`📝 [ANALYSE] Incident Data Preview:`, {
       hasBody: !!req.body?.body,
@@ -354,7 +383,7 @@ app.post('/analyse', async (req, res) => {
         contactEmail: process.env.SENDGRID_FROM_EMAIL || ''
       };
       const ackHtml = await generateAcknowledgementEmailHtml(ackContext);
-      emitStage({ stage: 'ACK_PREPARED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Acknowledgement prepared', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+      emitStage({ stage: 'ACK_PREPARED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Acknowledgement prepared', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
       
       console.log(`📧 [EMAIL][ACK] Preparing acknowledgement email for request ${requestId}`, {
         recipients: ackTo,
@@ -374,7 +403,7 @@ app.post('/analyse', async (req, res) => {
         });
         
         await mailSender(ackTo, ackSubject, ackHtml);
-        emitStage({ stage: 'ACK_SENT', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Ack email sent', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+        emitStage({ stage: 'ACK_SENT', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Ack email sent', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
         
         emailTracker.acknowledgementSent = true;
         emailTracker.totalEmailsSent++;
@@ -404,11 +433,11 @@ app.post('/analyse', async (req, res) => {
       
       emailTracker.emailErrors.push(errorInfo);
       console.error(`❌ [EMAIL][ACK] Failed to send acknowledgement for request ${requestId}:`, errorInfo);
-      emitStage({ stage: 'ACK_SENT', status: 'error', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Ack email failed', meta: { error: ackError?.message } });
+      emitStage({ stage: 'ACK_SENT', status: 'error', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Ack email failed', meta: { incidentNumber: incidentNumber, error: ackError?.message } });
     }
 
     console.log('[ANALYSE] Starting RCA generation');
-    emitStage({ stage: 'RCA_SEVERITY_STARTED', status: 'in_progress', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA & severity assessment started', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+    emitStage({ stage: 'RCA_SEVERITY_STARTED', status: 'in_progress', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA & severity assessment started', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
     const report = await analyzeIncident(incidentData);
     console.log('[ANALYSE] RCA generated');
     
@@ -423,7 +452,7 @@ app.post('/analyse', async (req, res) => {
       aiAssessedSeverity: aiSeverity,
       severityChanged: report.severityAssessment?.initialSeverity !== aiSeverity
     });
-    emitStage({ stage: 'RCA_SEVERITY_COMPLETED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA & severity assessment completed', meta: { initialSeverity: report.severityAssessment?.initialSeverity, aiSeverity, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+    emitStage({ stage: 'RCA_SEVERITY_COMPLETED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA & severity assessment completed', meta: { incidentNumber: incidentNumber, initialSeverity: report.severityAssessment?.initialSeverity, aiSeverity, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
     
     // Store the incident with metadata
     const incidentRecord = {
@@ -437,7 +466,9 @@ app.post('/analyse', async (req, res) => {
       executiveSummary: report.executiveSummary,
       affectedUsers: extractAffectedUsers(report),
       responseTime: calculateResponseTime(incidentData),
-      incidentNumber: incidentData?.properties?.incidentNumber || incidentData?.properties?.providerIncidentId || null,
+      internalId: internalId,
+      armId: armId,
+      incidentNumber: incidentNumber,
       tenant: {
         key: tenantCtx.key,
         displayName: tenantCtx.displayName,
@@ -477,7 +508,7 @@ app.post('/analyse', async (req, res) => {
         console.log('[SENTINEL] Attempting auto-assignment/update', { incidentArmId, aiSeverity });
         
         const sentinelStartTime = Date.now();
-        emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'in_progress', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Updating Sentinel incident', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+        emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'in_progress', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Updating Sentinel incident', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
         
         // Pass AI-assessed severity to Sentinel update (owner/status taken from env)
         assignmentResult = await updateSentinelIncident(
@@ -497,18 +528,18 @@ app.post('/analyse', async (req, res) => {
             incidentId: assignmentResult.incidentId,
             severity: assignmentResult.severity
           });
-          emitStage({ stage: 'SENTINEL_UPDATED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel updated', meta: { durationMs: sentinelDuration, severity: assignmentResult.severity, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+          emitStage({ stage: 'SENTINEL_UPDATED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel updated', meta: { incidentNumber: incidentNumber, durationMs: sentinelDuration, severity: assignmentResult.severity, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
         } else {
           console.error(`[SENTINEL] Update failed (${sentinelDuration}ms)`, assignmentResult);
-          emitStage({ stage: 'SENTINEL_UPDATED', status: 'error', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update failed', meta: { durationMs: sentinelDuration, error: assignmentResult?.error, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+          emitStage({ stage: 'SENTINEL_UPDATED', status: 'error', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update failed', meta: { incidentNumber: incidentNumber, durationMs: sentinelDuration, error: assignmentResult?.error, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
         }
       } else {
         console.log('[SENTINEL] Skipping update (no incident ARM id found)');
-        emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - no ARM id', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+        emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - no ARM id', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
       }
     } else {
       console.log('[SENTINEL] Skipping update (config not set)');
-      emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - config missing', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+      emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - config missing', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
     }
 
     // Final RCA email to tenant recipients (customerMail.toSenderMail)
@@ -549,7 +580,7 @@ app.post('/analyse', async (req, res) => {
         });
         
         const html = await generateOutlookHtmlFromRCA(correctedReport);
-        emitStage({ stage: 'RCA_EMAIL_PREPARED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA email prepared', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+        emitStage({ stage: 'RCA_EMAIL_PREPARED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA email prepared', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
         
         console.log(`📧 [EMAIL][RCA] Sending RCA email for request ${requestId}`, { 
           to, 
@@ -561,7 +592,7 @@ app.post('/analyse', async (req, res) => {
         });
         
         await mailSender(to, subject, html);
-        emitStage({ stage: 'RCA_EMAIL_SENT', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA email sent', meta: { tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+        emitStage({ stage: 'RCA_EMAIL_SENT', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA email sent', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
         
         emailTracker.rcaReportSent = true;
         emailTracker.totalEmailsSent++;
@@ -605,7 +636,7 @@ app.post('/analyse', async (req, res) => {
       }
       
       console.error(`❌ [EMAIL][RCA] Failed to send RCA email for request ${requestId}:`, errorInfo);
-      emitStage({ stage: 'RCA_EMAIL_SENT', status: 'error', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA email failed', meta: { error: rcaEmailError?.message } });
+      emitStage({ stage: 'RCA_EMAIL_SENT', status: 'error', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA email failed', meta: { incidentNumber: incidentNumber, error: rcaEmailError?.message } });
     }
 
     // ===== FINAL EMAIL TRACKING SUMMARY =====
@@ -672,7 +703,7 @@ app.post('/analyse', async (req, res) => {
       processingTime: totalDuration
     };
     
-    emitStage({ stage: 'PIPELINE_COMPLETED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Pipeline completed', meta: { totalDuration, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+    emitStage({ stage: 'PIPELINE_COMPLETED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Pipeline completed', meta: { incidentNumber: incidentNumber, totalDuration, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
     res.json(response);
   } catch (error) {
     console.error('Analysis error:', error);
@@ -690,6 +721,8 @@ app.get('/incidents', async (req, res) => {
     // Return simplified incident data for dashboard including severity assessment
     const simplifiedIncidents = incidents.map(inc => ({
       id: inc.id,
+      internalId: inc.internalId,
+      armId: inc.armId,
       timestamp: inc.timestamp,
       severity: inc.severity,
       status: inc.status,

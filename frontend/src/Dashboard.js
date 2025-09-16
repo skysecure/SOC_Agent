@@ -11,7 +11,7 @@ import ReportDisplay from './components/ReportDisplay';
 import AIChatPanel from './components/AIChatPanel';
 import ThreatIntelligence from './components/ThreatIntelligence';
 import LiveAgentFeed from './components/LiveAgentFeed';
-
+import CustomDropdown from './components/CustomDropdown';
 
 const IP = process.env.IP || "localhost";
 const PORT = process.env.PORT || "3002";
@@ -241,9 +241,16 @@ function Dashboard() {
   };
 
   const getStatusClass = (status) => {
-    if (status === 'closed') return 'status-closed';
-    if (status === 'active') return 'status-active';
-    return 'status-active'; // Default to active for any other status
+    const normalized = String(status || '').toLowerCase();
+    if (normalized === 'closed' || normalized === 'resolved') return 'status-closed';
+    if (normalized === 'new') return 'status-new';
+    if (normalized === 'investigating') return 'status-investigating';
+    if (
+      normalized === 'active' ||
+      normalized === 'open' ||
+      normalized === 'in progress'
+    ) return 'status-active';
+    return 'status-active';
   };
 
   const formatAffectedUsers = (users) => {
@@ -302,17 +309,12 @@ function Dashboard() {
       <header className="dashboard-header">
         <h1>SOC Incident Dashboard</h1>
         <div className="header-actions">
-          <select
+          <CustomDropdown
+            options={tenants}
             value={selectedTenantKey}
-            onChange={(e) => setSelectedTenantKey(e.target.value)}
-            className="nav-btn"
-            style={{ marginRight: '0.5rem' }}
-            title="Filter by tenant"
-          >
-            {tenants.map(t => (
-              <option key={t.key} value={t.key}>{t.displayName}</option>
-            ))}
-          </select>
+            onChange={setSelectedTenantKey}
+            placeholder="Select tenant"
+          />
           <button onClick={fetchIncidents} className="refresh-btn">↻ Refresh</button>
           <Link to="/" className="nav-btn">← Back to Analyzer</Link>
         </div>
@@ -451,7 +453,6 @@ function Dashboard() {
                   <th>Severity</th>
                   <th>Status</th>
                   <th>Owner</th>
-                  <th>Subscription</th>
                   <th>Affected Users</th>
                   <th>Summary</th>
                   <th>Actions</th>
@@ -470,11 +471,17 @@ function Dashboard() {
                   >
                     <td>{format(new Date(incident.timestamp), 'MMM dd, HH:mm')}</td>
                     <td className="incident-number-cell">{incident.incidentNumber || 'N/A'}</td>
-                    <td>{incident.type}</td>
-                    <td>{incident.tenant?.displayName || '—'}</td>
+                    <td className="type-cell" title={incident.type}>{incident.type}</td>
+                    <td>
+                      {incident.tenant?.displayName ? (
+                        <span className="badge badge-tenant" title={incident.tenant?.subscriptionId || ''}>
+                          {incident.tenant.displayName}
+                        </span>
+                      ) : '—'}
+                    </td>
                     <td>
                       <div style={{display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start'}}>
-                        <span className={`severity-badge ${getSeverityClass(incident.severityAssessment?.initialSeverity || incident.severity)}`}>
+                        <span className={`severity-badge outlined ${getSeverityClass(incident.severityAssessment?.initialSeverity || incident.severity)}`}>
                           Initial: {incident.severityAssessment?.initialSeverity || incident.severity || 'UNKNOWN'}
                         </span>
                         {incident.severityAssessment?.aiAssessedSeverity && (
@@ -489,23 +496,44 @@ function Dashboard() {
                         {incident.status}
                       </span>
                     </td>
-                    <td>{incident.tenant?.ownerName || '—'}</td>
-                    <td>{incident.tenant?.subscriptionId || '—'}</td>
-                    <td>{formatAffectedUsers(incident.affectedUsers)}</td>
-                    <td className="summary-cell">{incident.executiveSummary}</td>
+                    <td>
+                      {incident.tenant?.ownerName ? (
+                        <span className="badge badge-owner">
+                          {incident.tenant.ownerName}
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td>
+                      {incident.affectedUsers ? (
+                        <span className="badge badge-users" title={formatAffectedUsers(incident.affectedUsers)}>
+                          {Array.isArray(incident.affectedUsers)
+                            ? `${incident.affectedUsers.length} user${incident.affectedUsers.length === 1 ? '' : 's'}`
+                            : formatAffectedUsers(incident.affectedUsers)}
+                        </span>
+                      ) : 'N/A'}
+                    </td>
+                    <td className="summary-cell" title={incident.executiveSummary}>{incident.executiveSummary}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button
-                          className="view-btn quick-look-btn"
+                          className="view-btn quick-look-btn icon-only"
+                          aria-label="Quick Look"
+                          title="Quick Look"
                           onClick={(e) => {
                             e.stopPropagation();
                             setQuickLookIncident(incident);
                           }}
                         >
-                          Quick Look
+                          <span className="btn-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7zm0 12a5 5 0 110-10 5 5 0 010 10zm0-8a3 3 0 100 6 3 3 0 000-6z"/>
+                            </svg>
+                          </span>
                         </button>
                         <button
-                          className="view-btn detailed-view-btn"
+                          className="view-btn detailed-view-btn icon-only"
+                          aria-label="Detailed View"
+                          title="Detailed View"
                           onClick={async (e) => {
                             e.stopPropagation();
                             setSelectedIncident(incident);
@@ -522,10 +550,16 @@ function Dashboard() {
                             }
                           }}
                         >
-                          Detailed View
+                          <span className="btn-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zM9.5 14C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                            </svg>
+                          </span>
                         </button>
                         <button
-                          className="view-btn ai-chat-btn"
+                          className="view-btn ai-chat-btn icon-only"
+                          aria-label="AI Chat"
+                          title="AI Chat"
                           onClick={(e) => {
                             e.stopPropagation();
                             setChatIncident(incident);
@@ -533,7 +567,12 @@ function Dashboard() {
                             setShowAIChat(true);
                           }}
                         >
-                          AI Chat
+                          <span className="btn-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M20 2H4c-1.1 0-2 .9-2 2v14l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                              <path d="M7 9h10v2H7zm0-3h10v2H7z"/>
+                            </svg>
+                          </span>
                         </button>
                       </div>
                     </td>
@@ -564,17 +603,56 @@ function Dashboard() {
                   <ReportDisplay report={selectedIncidentDetails.report} />
                 </div>
               ) : quickLookIncident ? (
-                <div className="incident-details">
-                  <p><strong>ID:</strong> {quickLookIncident.id}</p>
-                  <p><strong>Time:</strong> {format(new Date(quickLookIncident.timestamp), 'PPpp')}</p>
-                  <p><strong>Type of Incident:</strong> {quickLookIncident.type}</p>
-                  <p><strong>Severity:</strong> {quickLookIncident.severity}</p>
-                  <p><strong>Status:</strong> {quickLookIncident.status}</p>
-                  <p><strong>Response Time:</strong> {quickLookIncident.responseTime} minutes</p>
-                  <p><strong>Affected Users:</strong> {formatAffectedUsers(quickLookIncident.affectedUsers)}</p>
-                  <p><strong>Executive Summary:</strong> {quickLookIncident.executiveSummary}</p>
+                <div className="quicklook-card">
+                  <div className="accent-bar" />
+                  <div className="quicklook-header">
+                    <div className="ql-title">
+                      <span className="incident-number-chip">#{quickLookIncident.incidentNumber || quickLookIncident.id}</span>
+                      <h3 className="ql-type" title={quickLookIncident.type}>{quickLookIncident.type}</h3>
+                    </div>
+                    <div className="ql-severity">
+                      <span className={`severity-badge outlined ${getSeverityClass(quickLookIncident.severityAssessment?.initialSeverity || quickLookIncident.severity)}`}>
+                        Initial: {quickLookIncident.severityAssessment?.initialSeverity || quickLookIncident.severity || 'UNKNOWN'}
+                      </span>
+                      {quickLookIncident.severityAssessment?.aiAssessedSeverity && (
+                        <span className={`severity-badge ${getSeverityClass(quickLookIncident.severityAssessment.aiAssessedSeverity)}`}>
+                          AI: {quickLookIncident.severityAssessment.aiAssessedSeverity}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="meta-row">
+                    <span className="badge badge-time" title={format(new Date(quickLookIncident.timestamp), 'PPpp')}>
+                      {format(new Date(quickLookIncident.timestamp), 'MMM dd, HH:mm')}
+                    </span>
+                    {quickLookIncident?.tenant?.displayName && (
+                      <span className="badge badge-tenant" title={quickLookIncident.tenant?.subscriptionId || ''}>{quickLookIncident.tenant.displayName}</span>
+                    )}
+                    <span className={`status-badge ${getStatusClass(quickLookIncident.status)}`}>{quickLookIncident.status}</span>
+                    {quickLookIncident?.tenant?.ownerName && (
+                      <span className="badge badge-owner">{quickLookIncident.tenant.ownerName}</span>
+                    )}
+                    {quickLookIncident?.affectedUsers && (
+                      <span className="badge badge-users" title={formatAffectedUsers(quickLookIncident.affectedUsers)}>
+                        {Array.isArray(quickLookIncident.affectedUsers)
+                          ? `${quickLookIncident.affectedUsers.length} user${quickLookIncident.affectedUsers.length === 1 ? '' : 's'}`
+                          : formatAffectedUsers(quickLookIncident.affectedUsers)}
+                      </span>
+                    )}
+                  </div>
+
+                  {quickLookIncident.executiveSummary && (
+                    <div className="summary-box" title={quickLookIncident.executiveSummary}>
+                      <svg className="icon-inline" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h18v2H3V5zm0 4h12v2H3V9zm0 4h18v2H3v-2zm0 4h12v2H3v-2z"/></svg>
+                      <div className="summary-text">{quickLookIncident.executiveSummary}</div>
+                    </div>
+                  )}
+
                   {quickLookIncident?.tenant && (
-                    <p><strong>Tenant:</strong> {quickLookIncident.tenant.displayName} • <strong>Subscription:</strong> {quickLookIncident.tenant.subscriptionId} • <strong>Workspace:</strong> {quickLookIncident.tenant.resourceGroup}/{quickLookIncident.tenant.workspaceName} • <strong>Owner:</strong> {quickLookIncident.tenant.ownerName}</p>
+                    <div className="tenant-footnote">
+                      <strong>Subscription:</strong> {quickLookIncident.tenant.subscriptionId} • <strong>Workspace:</strong> {quickLookIncident.tenant.resourceGroup}/{quickLookIncident.tenant.workspaceName}
+                    </div>
                   )}
                 </div>
               ) : null}

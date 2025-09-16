@@ -355,10 +355,23 @@
   transition: all 0.2s ease;
 }
 
+/* Outlined variant for initial severity badges */
+.severity-badge.outlined {
+  background: transparent !important;
+  border: 1px solid currentColor;
+}
+
 .severity-critical {
   background: #ef4444;
   color: white;
   animation: pulse 1.5s infinite;
+}
+
+/* Outlined overrides for per-severity colors */
+.severity-badge.outlined.severity-critical {
+  color: #ef4444;
+  border-color: #ef4444;
+  animation: none;
 }
 
 .severity-high {
@@ -366,14 +379,29 @@
   color: white;
 }
 
+.severity-badge.outlined.severity-high {
+  color: #f97316;
+  border-color: #f97316;
+}
+
 .severity-medium {
   background: #f59e0b;
   color: white;
 }
 
+.severity-badge.outlined.severity-medium {
+  color: #f59e0b;
+  border-color: #f59e0b;
+}
+
 .severity-low {
   background: #10b981;
   color: white;
+}
+
+.severity-badge.outlined.severity-low {
+  color: #10b981;
+  border-color: #10b981;
 }
 
 /* Analysis Content */

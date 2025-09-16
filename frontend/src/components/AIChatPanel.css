@@ -48,6 +48,10 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 250px;
 }
 
 .ai-status-indicator {
@@ -82,11 +86,33 @@
 .ai-chat-messages {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 1rem;
   background: #f9fafb;
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f3f4f6;
+}
+
+/* Custom scrollbar for webkit browsers */
+.ai-chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ai-chat-messages::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 3px;
+}
+
+.ai-chat-messages::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.ai-chat-messages::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .ai-message {
@@ -125,6 +151,10 @@
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   position: relative;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .ai-message.user .ai-message-content {
@@ -136,6 +166,9 @@
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.5;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .ai-message-time {
@@ -203,6 +236,10 @@
   transition: all 0.2s ease;
   color: #4b5563;
   font-weight: 500;
+  white-space: nowrap;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ai-suggestion-chip:hover {
@@ -228,6 +265,9 @@
   font-size: 0.9rem;
   transition: all 0.2s ease;
   background: #f9fafb;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ai-chat-input:focus {
