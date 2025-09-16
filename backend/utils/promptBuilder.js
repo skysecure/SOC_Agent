@@ -21,6 +21,7 @@ export function buildPrompt(agentName, options = {}) {
     incidentData,
     htmlContent,
     rcaData,
+    ackData,
     chatMode,
     incidentContext,
     useShortVersion = false,
@@ -38,6 +39,9 @@ export function buildPrompt(agentName, options = {}) {
       
       case 'EMAIL_VERIFIER':
         return getPromptWithData('EMAIL_VERIFIER', { htmlContent, rcaData });
+      
+      case 'EMAIL_ACK_FORMATTER':
+        return getPromptWithData('EMAIL_ACK_FORMATTER', { htmlContent, ackData });
       
       case 'CHAT_ASSISTANT':
         return getPromptWithData('CHAT_ASSISTANT', { chatMode, incidentContext });

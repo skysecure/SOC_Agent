@@ -218,13 +218,21 @@ function ReportDisplay({ report }) {
 
   // Helper: counts to show on chips
   const sectionCounts = useMemo(() => {
+    // Safe handling of recommendedActions
+    let recommendedActionsCount = 0;
+    if (report?.recommendedActions && typeof report.recommendedActions === 'object' && !Array.isArray(report.recommendedActions)) {
+      const immediate = Array.isArray(report.recommendedActions.immediate) ? report.recommendedActions.immediate : [];
+      const shortTerm = Array.isArray(report.recommendedActions.shortTerm) ? report.recommendedActions.shortTerm : [];
+      const longTerm = Array.isArray(report.recommendedActions.longTerm) ? report.recommendedActions.longTerm : [];
+      recommendedActionsCount = [...immediate, ...shortTerm, ...longTerm].length;
+    } else if (Array.isArray(report?.recommendedActions)) {
+      // Handle case where recommendedActions is directly an array
+      recommendedActionsCount = report.recommendedActions.length;
+    }
+
     return {
       timelineOfEvents: Array.isArray(report?.timelineOfEvents) ? report.timelineOfEvents.length : 0,
-      recommendedActions: [
-        ...(report?.recommendedActions?.immediate || []),
-        ...(report?.recommendedActions?.shortTerm || []),
-        ...(report?.recommendedActions?.longTerm || [])
-      ].length,
+      recommendedActions: recommendedActionsCount,
       evidenceAndArtifacts: Array.isArray(report?.evidenceAndArtifacts?.iocs) ? report.evidenceAndArtifacts.iocs.length : 0
     };
   }, [report]);

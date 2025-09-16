@@ -44,7 +44,8 @@ export async function updateSentinelIncident(incidentId, severity, additionalDet
   console.log('Input parameters:', {
     incidentId: incidentId,
     severity: severity,
-    hasAdditionalDetails: Object.keys(additionalDetails).length > 0
+    hasAdditionalDetails: Object.keys(additionalDetails).length > 0,
+    hasIncidentData: !!additionalDetails.incidentData
   });
 
   try {
@@ -60,25 +61,51 @@ export async function updateSentinelIncident(incidentId, severity, additionalDet
     
     const apiUrl = buildSentinelApiUrl(incidentName);
 
-    // Fetch existing incident to preserve immutable fields like title
-    const tokenPreview = DEBUG ? '(token preview hidden)' : '';
-    if (DEBUG) {
-      console.log('📥 Fetching existing incident to preserve title');
-    }
-    const existingIncident = await fetchExistingIncident(apiUrl, token);
-    const existingTitle = existingIncident?.properties?.title;
-    if (DEBUG) {
-      console.log('Existing Sentinel incident fields:', {
-        hasTitle: !!existingTitle,
-        titlePreview: existingTitle ? existingTitle.substring(0, 80) : 'N/A'
-      });
+    // Check if incident data was provided from /analyse endpoint to avoid extra API call
+    let existingTitle;
+    let existingIncident;
+    
+    if (additionalDetails.incidentData && additionalDetails.incidentData.properties) {
+      // Use the provided incident data from /analyse endpoint
+      existingIncident = additionalDetails.incidentData;
+      existingTitle = existingIncident.properties.title;
+      
+      console.log('✅ Using provided incident data from /analyse endpoint - skipping API fetch');
+      if (DEBUG) {
+        console.log('Provided incident data:', {
+          hasTitle: !!existingTitle,
+          titlePreview: existingTitle ? existingTitle.substring(0, 80) : 'N/A',
+          incidentNumber: existingIncident.properties.incidentNumber,
+          severity: existingIncident.properties.severity,
+          status: existingIncident.properties.status
+        });
+      }
+    } else {
+      // Fallback: Fetch existing incident to preserve immutable fields like title
+      const tokenPreview = DEBUG ? '(token preview hidden)' : '';
+      if (DEBUG) {
+        console.log('📥 No incident data provided - fetching existing incident from API');
+      }
+      existingIncident = await fetchExistingIncident(apiUrl, token);
+      existingTitle = existingIncident?.properties?.title;
+      console.log('Existing Sentinel incident fields: is found', existingIncident?.properties?.title, existingIncident?.properties, existingIncident);
+      if (DEBUG) {
+        console.log('Fetched Sentinel incident fields:', {
+          hasTitle: !!existingTitle,
+          titlePreview: existingTitle ? existingTitle.substring(0, 80) : 'N/A'
+        });
+      }
     }
 
     if (!existingTitle || (typeof existingTitle === 'string' && existingTitle.trim().length === 0)) {
       throw new Error('Existing Sentinel incident title not found; aborting update to avoid changing title/description');
     }
 
-    const updatePayload = buildUpdatePayload(severity, additionalDetails, existingTitle);
+    // Remove incidentData from additionalDetails before building payload
+    const cleanedDetails = { ...additionalDetails };
+    delete cleanedDetails.incidentData;
+    
+    const updatePayload = buildUpdatePayload(severity, cleanedDetails, existingTitle);
 
     console.log(`🎯 Updating Sentinel incident: ${incidentName}`);
     

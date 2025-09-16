@@ -461,6 +461,7 @@ app.post('/analyse', async (req, res) => {
           incidentArmId,
           aiSeverity,
           {
+            incidentData: incidentData,  // Pass the full incident data to avoid extra API call
             description: `RCA completed by SOC Automation Agent. \nAI-Assessed Severity: ${aiSeverity} (Initial: ${report.severityAssessment?.initialSeverity})\nType: ${incidentRecord.type}\nExecutive Summary: ${incidentRecord.executiveSummary?.substring(0, 500)}...\nAnalysis Timestamp: ${new Date().toISOString()}`
           }
         );
