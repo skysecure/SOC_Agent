@@ -94,9 +94,10 @@ function Toast({ pipeline, onClose }) {
   );
 }
 
-export default function LiveAgentFeed({ selectedTenantKey = 'ALL' }) {
+export default function LiveAgentFeed({ selectedTenantKey = 'ALL', onPipelineCompleted }) {
   const [pipelines, setPipelines] = useState({}); // requestId -> {requestId, incidentId, events, stageState, meta}
   const eventSourceRef = useRef(null);
+  const connectedAtRef = useRef(new Date());
 
   useEffect(() => {
     const url = `http://${IP}:${PORT}/agent/stream?scope=global&history=50`;
@@ -120,6 +121,17 @@ export default function LiveAgentFeed({ selectedTenantKey = 'ALL' }) {
           }
           return { ...prev, [key]: { ...current, requestId: data.requestId, incidentId: data.incidentId, events: nextEvents, stageState: nextStage, meta: nextMeta } };
         });
+
+        // Trigger dashboard refetch on pipeline completion (guarded)
+        if (data.stage === 'PIPELINE_COMPLETED') {
+          const eventTs = new Date(data.ts);
+          const isNewEvent = isFinite(eventTs.getTime()) && eventTs > connectedAtRef.current;
+          const tenantKey = data.tenantKey || data.meta?.tenantKey;
+          const matchesTenant = selectedTenantKey === 'ALL' || tenantKey === selectedTenantKey;
+          if (isNewEvent && matchesTenant) {
+            try { onPipelineCompleted && onPipelineCompleted(); } catch (_) {}
+          }
+        }
       } catch (err) {}
     });
 

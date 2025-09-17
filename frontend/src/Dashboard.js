@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { format } from 'date-fns';
@@ -141,6 +141,17 @@ function Dashboard() {
       setLoading(false);
     }
   };
+
+  // Debounced refetch to avoid burst reloads when multiple pipelines complete
+  const debounceTimerRef = useRef(null);
+  const debouncedFetchIncidents = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      fetchIncidents();
+    }, 1000);
+  }, []);
 
   const fetchTenants = async () => {
     try {
@@ -322,38 +333,7 @@ function Dashboard() {
 
       <main className="dashboard-main">
         {/* AI Insights Section */}
-        <section className="ai-insights-section">
-          <div className="ai-insight-card">
-            <div className="ai-insight-header">
-              <svg className="ai-icon" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-              </svg>
-              <h3 className="ai-insight-title">AI Threat Detection</h3>
-            </div>
-            <div className="ai-insight-content">
-              <p>Active monitoring of {metrics.total} incidents with AI-powered analysis. 
-                {!selectedIncident ? 
-                  <strong> Select an incident from the table below to analyze.</strong> : 
-                  <strong> Incident {selectedIncident.id} selected for analysis.</strong>
-                }
-              </p>
-              <button 
-                className="ai-suggestion-chip"
-                onClick={() => setShowThreatIntel(!showThreatIntel)}
-                style={{ marginTop: '0.5rem' }}
-              >
-                {showThreatIntel ? 'Hide' : 'Show'} Threat Intelligence
-              </button>
-            </div>
-          </div>
-        </section>
 
-        {/* Show Threat Intelligence if toggled */}
-        {showThreatIntel && (
-          <section style={{ marginBottom: '2rem' }}>
-            <ThreatIntelligence incident={selectedIncident} />
-          </section>
-        )}
 
         {/* Key Metrics */}
         <section className="metrics-section">
@@ -725,7 +705,7 @@ function Dashboard() {
         allIncidents={incidents}
       />
       {/* Live Agent Feed overlay (non-intrusive) */}
-      <LiveAgentFeed selectedTenantKey={selectedTenantKey} />
+      <LiveAgentFeed selectedTenantKey={selectedTenantKey} onPipelineCompleted={debouncedFetchIncidents} />
     </div>
   );
 }

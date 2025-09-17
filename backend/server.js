@@ -283,6 +283,54 @@ app.post('/analyse', async (req, res) => {
       });
     }
 
+    // Check for potential duplicate requests (safer criteria) BEFORE emitting any stages
+    // Allow duplicate block ONLY if it's the same Logic App run, or if the
+    // same incident/content arrived very recently (time-window based).
+    const DUPLICATE_WINDOW_MS = 60 * 1000; // 60 seconds window for safety
+    const existingIncident = incidents.find(inc => {
+      const idMatch = inc.originalData?.id === incidentIdentifiers.incidentId ||
+                      inc.originalData?.properties?.id === incidentIdentifiers.incidentId ||
+                      inc.originalData?.name === incidentIdentifiers.incidentId;
+
+      const logicAppMatch = inc.emailTracking?.logicApp?.workflowRunId === incidentIdentifiers.logicApp.workflowRunId &&
+                            inc.emailTracking?.logicApp?.workflowRunId !== 'unknown';
+
+      const hashMatch = inc.emailTracking?.dataHash === incidentIdentifiers.dataHash &&
+                        inc.emailTracking?.dataHash !== 'unknown';
+
+      const isRecent = inc.timestamp && (Date.now() - inc.timestamp.getTime() < DUPLICATE_WINDOW_MS);
+
+      // Block if exact same Logic App run (definitive duplicate)
+      if (logicAppMatch) return true;
+      // Otherwise only treat as duplicate if it's the same incident/content AND very recent
+      return (idMatch || hashMatch) && isRecent;
+    });
+    
+    if (existingIncident) {
+      console.log(`🚨 [ANALYSE] DUPLICATE REQUEST BLOCKED!`, {
+        requestId: requestId,
+        existingIncidentId: existingIncident.id,
+        existingTimestamp: existingIncident.timestamp,
+        timeDifference: Date.now() - existingIncident.timestamp.getTime(),
+        duplicateReason: 'Same incident ID found in memory',
+        action: 'Returning existing incident data without processing'
+      });
+      
+      // Return existing incident data to prevent duplicate processing
+      const response = {
+        ...existingIncident.report,
+        sentinelAssignment: existingIncident.sentinelAssignment,
+        emailTracking: existingIncident.emailTracking || 'No tracking data',
+        requestId: requestId,
+        duplicateBlocked: true,
+        originalRequestId: existingIncident.id,
+        message: 'Duplicate request blocked - incident already processed'
+      };
+      return res.json(response);
+    } else {
+      console.log(`✅ [ANALYSE] No duplicate incidents found - proceeding with analysis`);
+    }
+
     // Live updates: pipeline started (enriched with identifiers + tenant)
     emitStage({ 
       stage: 'INCIDENT_RECEIVED', 
@@ -308,51 +356,6 @@ app.post('/analyse', async (req, res) => {
       title: incidentIdentifiers.title,
       createdTime: incidentIdentifiers.createdTime
     });
-    
-    // Check for potential duplicate requests (multiple detection methods)
-    const existingIncident = incidents.find(inc => {
-      // Method 1: Check incident ID
-      const idMatch = inc.originalData?.id === incidentIdentifiers.incidentId ||
-                     inc.originalData?.properties?.id === incidentIdentifiers.incidentId ||
-                     inc.originalData?.name === incidentIdentifiers.incidentId;
-      
-      // Method 2: Check Logic App workflow run (most reliable for Logic Apps)
-      const logicAppMatch = inc.emailTracking?.logicApp?.workflowRunId === incidentIdentifiers.logicApp.workflowRunId &&
-                           inc.emailTracking?.logicApp?.workflowRunId !== 'unknown';
-      
-      // Method 3: Check data hash (content-based deduplication)
-      const hashMatch = inc.emailTracking?.dataHash === incidentIdentifiers.dataHash &&
-                       inc.emailTracking?.dataHash !== 'unknown';
-      
-      return idMatch || logicAppMatch || hashMatch;
-    });
-    
-    if (existingIncident) {
-      console.log(`🚨 [ANALYSE] DUPLICATE REQUEST BLOCKED!`, {
-        requestId: requestId,
-        existingIncidentId: existingIncident.id,
-        existingTimestamp: existingIncident.timestamp,
-        timeDifference: Date.now() - existingIncident.timestamp.getTime(),
-        duplicateReason: 'Same incident ID found in memory',
-        action: 'Returning existing incident data without processing'
-      });
-      
-      // Return existing incident data to prevent duplicate processing
-      const response = {
-        ...existingIncident.report,
-        sentinelAssignment: existingIncident.sentinelAssignment,
-        emailTracking: existingIncident.emailTracking || 'No tracking data',
-        requestId: requestId,
-        duplicateBlocked: true,
-        originalRequestId: existingIncident.id,
-        message: 'Duplicate request blocked - incident already processed'
-      };
-      
-      emitStage({ stage: 'PIPELINE_COMPLETED', status: 'done', requestId, message: 'Duplicate request blocked - existing data returned', meta: { duplicateBlocked: true } });
-      return res.json(response);
-    } else {
-      console.log(`✅ [ANALYSE] No duplicate incidents found - proceeding with analysis`);
-    }
     
     // ===== EMAIL TRACKING START =====
     const emailTracker = {
@@ -421,6 +424,7 @@ app.post('/analyse', async (req, res) => {
             SENDGRID_FROM_EMAIL: !!process.env.SENDGRID_FROM_EMAIL
           }
         });
+        emitStage({ stage: 'ACK_SENT', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Ack email skipped - no recipients configured', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
       }
     } catch (ackError) {
       const errorInfo = {
@@ -535,11 +539,11 @@ app.post('/analyse', async (req, res) => {
         }
       } else {
         console.log('[SENTINEL] Skipping update (no incident ARM id found)');
-        // emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - no ARM id', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+        emitStage({ stage: 'SENTINEL_UPDATED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - no ARM id', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
       }
     } else {
       console.log('[SENTINEL] Skipping update (config not set)');
-      // emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - config missing', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+      emitStage({ stage: 'SENTINEL_UPDATED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - config missing', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
     }
 
     // Final RCA email to tenant recipients (customerMail.toSenderMail)
@@ -618,6 +622,7 @@ app.post('/analyse', async (req, res) => {
             SENDGRID_FROM_EMAIL: !!process.env.SENDGRID_FROM_EMAIL
           }
         });
+        emitStage({ stage: 'RCA_EMAIL_SENT', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA email skipped - no recipients configured', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
       }
     } catch (rcaEmailError) {
       const errorInfo = {
