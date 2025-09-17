@@ -1,87 +1,97 @@
-/* Global Animations */
-@keyframes fadeInUp {
-  from { 
-    opacity: 0; 
-    transform: translateY(30px); 
-  }
-  to { 
-    opacity: 1; 
-    transform: translateY(0); 
-  }
+/* Minimal Enterprise Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-@keyframes slideInRight {
-  from { 
-    opacity: 0; 
-    transform: translateX(30px); 
-  }
-  to { 
-    opacity: 1; 
-    transform: translateX(0); 
-  }
-}
-
-@keyframes scaleIn {
-  from { 
-    opacity: 0; 
-    transform: scale(0.9); 
-  }
-  to { 
-    opacity: 1; 
-    transform: scale(1); 
-  }
-}
-
-/* Dashboard Container */
+/* Enterprise Dashboard Container */
 .dashboard {
   min-height: 100vh;
-  background: #f8fafc;
-  animation: fadeInUp 0.5s ease-out;
+  background: #f0f2f5;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
 }
 
-/* Simplified Header */
+/* Enterprise Dashboard Header */
 .dashboard-header {
-  background: #2563eb;
+  background: #1a2332;
   color: white;
-  padding: 1.2rem 2rem;
+  padding: 0.875rem 1.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-  animation: slideInRight 0.6s ease-out;
+  border-bottom: 2px solid #2d3748;
 }
 
 .dashboard-header h1 {
   margin: 0;
-  font-size: 1.75rem;
-  font-weight: 600;
+  font-size: 1.375rem;
+  font-weight: 500;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  letter-spacing: -0.02em;
 }
 
 .header-actions {
   display: flex;
   gap: 0.75rem;
+  align-items: center;
+}
+
+/* Tenant Dropdown in Header - Enterprise Style */
+.header-actions .custom-dropdown .dropdown-header {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 0.75rem;
+  height: 32px;
+}
+
+.header-actions .custom-dropdown .dropdown-header::before {
+  background: transparent;
+}
+
+.header-actions .custom-dropdown .dropdown-header:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.header-actions .custom-dropdown .dropdown-header.open {
+  background: white;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.header-actions .custom-dropdown .dropdown-arrow {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.header-actions .custom-dropdown .dropdown-header.open .dropdown-arrow {
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+.header-actions .custom-dropdown .dropdown-selected {
+  color: inherit;
 }
 
 .refresh-btn, .nav-btn {
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
+  padding: 0.375rem 0.875rem;
   text-decoration: none;
   color: white;
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.2);
+  background: transparent;
+  border: 1px solid #4a5568;
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.85rem;
-  font-weight: 500;
+  transition: background 0.15s ease;
+  font-size: 0.8125rem;
+  font-weight: 400;
 }
 
 .refresh-btn:hover, .nav-btn:hover {
-  background: rgba(255,255,255,0.2);
-  transform: scale(1.02);
+  background: #2d3748;
 }
 
 .refresh-btn:active, .nav-btn:active {
-  transform: scale(0.98);
+  background: #1a2332;
 }
 
 /* Main Dashboard Content */
@@ -91,115 +101,279 @@
   padding: 2rem;
 }
 
-/* Metrics Section with Animations */
+/* Enterprise Metrics Section - Executive KPI Dashboard */
 .metrics-section {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.25rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  margin-bottom: 1rem;
+  background: white;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+/* Add new metrics row */
+.metrics-extended {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  margin-bottom: 1rem;
+  background: white;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 
 .metric-card {
   background: white;
-  padding: 1.5rem;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  transition: all 0.3s ease;
-  border: 1px solid rgba(0,0,0,0.05);
-  animation: scaleIn 0.5s ease-out;
-  animation-fill-mode: both;
+  padding: 0.875rem 1rem;
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  transition: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
-.metric-card:nth-child(1) { animation-delay: 0.1s; }
-.metric-card:nth-child(2) { animation-delay: 0.2s; }
-.metric-card:nth-child(3) { animation-delay: 0.3s; }
-.metric-card:nth-child(4) { animation-delay: 0.4s; }
+.metric-card:last-child {
+  border-right: none;
+}
 
 .metric-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  background: #fafbfc;
+}
+
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 100%;
+  background: transparent;
+}
+
+/* Metric trend indicator */
+.metric-trend {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.625rem;
+  margin-top: 0.25rem;
+}
+
+.trend-up {
+  color: #059669;
+}
+
+.trend-down {
+  color: #dc2626;
+}
+
+.trend-neutral {
+  color: #6b7280;
+}
+
+.metric-subtitle {
+  font-size: 0.625rem;
+  color: #9ca3af;
+  margin-top: 0.125rem;
 }
 
 .metric-card h3 {
   color: #6b7280;
-  font-size: 0.85rem;
-  margin: 0 0 0.75rem 0;
+  font-size: 0.625rem;
+  margin: 0 0 0.375rem 0;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 600;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.metric-icon {
+  font-size: 0.75rem;
+  opacity: 0.7;
 }
 
 .metric-value {
-  font-size: 2.25rem;
-  font-weight: 700;
-  margin-bottom: 0.25rem;
-  transition: all 0.3s ease;
+  font-size: 1.75rem;
+  font-weight: 400;
+  margin-bottom: 0.125rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
 }
 
-.metric-card:hover .metric-value {
-  transform: scale(1.05);
+.metric-unit {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  font-weight: 400;
 }
 
 .metric-card p {
   color: #9ca3af;
-  font-size: 0.85rem;
+  font-size: 0.6875rem;
   margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-/* Metric Colors */
+/* Enterprise Metric Colors - Subtle Professional */
+.metric-card.total::before {
+  background: #4a5568;
+}
 .metric-card.total .metric-value {
-  color: #2563eb;
+  color: #1a2332;
 }
 
+.metric-card.high::before {
+  background: #dc2626;
+}
 .metric-card.high .metric-value {
-  color: #ef4444;
+  color: #dc2626;
 }
 
+.metric-card.closed::before,
+.metric-card.resolved::before {
+  background: #059669;
+}
+.metric-card.closed .metric-value,
 .metric-card.resolved .metric-value {
-  color: #10b981;
+  color: #047857;
 }
 
+.metric-card.response::before {
+  background: #d97706;
+}
 .metric-card.response .metric-value {
-  color: #f59e0b;
+  color: #b45309;
 }
 
-/* Charts Section with Improved Styling */
+/* Enterprise Charts Section - Executive Analytics Dashboard */
 .charts-section {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 1.25rem;
-  margin-bottom: 2rem;
+  grid-template-columns: 2fr 1.5fr 1.5fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* Additional analytics row */
+.analytics-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .chart-container {
   background: white;
-  padding: 1.5rem;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  border: 1px solid rgba(0,0,0,0.05);
-  animation: fadeInUp 0.6s ease-out;
-  animation-fill-mode: both;
-  transition: all 0.3s ease;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  transition: none;
+  min-height: 280px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
 }
 
-.chart-container:nth-child(1) { animation-delay: 0.5s; }
-.chart-container:nth-child(2) { animation-delay: 0.6s; }
-.chart-container:nth-child(3) { animation-delay: 0.7s; }
-
 .chart-container:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  background: #fafbfc;
+}
+
+/* Chart header with controls */
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.chart-controls {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.chart-control-btn {
+  padding: 0.125rem 0.375rem;
+  font-size: 0.625rem;
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.chart-control-btn:hover {
+  background: #f3f4f6;
+}
+
+.chart-control-btn.active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
 }
 
 .chart-container h3 {
-  color: #1f2937;
-  margin: 0 0 1rem 0;
-  font-size: 1.1rem;
-  font-weight: 600;
+  color: #1a2332;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* Chart Animations */
+/* Enterprise Chart Styles - Professional Data Visualization */
 .recharts-wrapper {
-  animation: scaleIn 0.8s ease-out;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+}
+
+.recharts-cartesian-axis-tick-value {
+  fill: #6b7280;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.recharts-legend-wrapper {
+  font-size: 11px;
+}
+
+.recharts-tooltip-wrapper {
+  outline: none !important;
+}
+
+.recharts-default-tooltip {
+  background: white !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+  padding: 8px !important;
+}
+
+.recharts-tooltip-label {
+  color: #1a2332 !important;
+  font-weight: 500 !important;
+  font-size: 12px !important;
+  margin-bottom: 4px !important;
+}
+
+.recharts-tooltip-item {
+  color: #4a5568 !important;
+  font-size: 11px !important;
+}
+
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: #f3f4f6;
+}
+
+.recharts-cartesian-axis-line {
+  stroke: #e5e7eb;
 }
 
 /* Severity Legend */
@@ -214,86 +388,172 @@
   margin: 0;
 }
 
-/* Incidents Table with Simplified Design */
+/* Enterprise Incidents Table - Executive Data Grid */
 .incidents-section {
   background: white;
-  padding: 2rem;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  border: 1px solid rgba(0,0,0,0.05);
-  animation: fadeInUp 0.8s ease-out 0.8s;
-  animation-fill-mode: both;
+  padding: 0;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+/* Table toolbar */
+.table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.table-filters {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.filter-btn {
+  padding: 0.25rem 0.625rem;
+  font-size: 0.625rem;
+  background: transparent;
+  border: 1px solid #d1d5db;
+  color: #4a5568;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  transition: background 0.1s ease;
+}
+
+.filter-btn:hover {
+  background: #f3f4f6;
+}
+
+.filter-btn.active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
+.table-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.search-input {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.6875rem;
+  border: 1px solid #d1d5db;
+  background: white;
+  width: 200px;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #9ca3af;
 }
 
 .incidents-section h2 {
-  color: #1f2937;
-  margin: 0 0 1.5rem 0;
-  font-size: 1.5rem;
-  font-weight: 600;
+  color: #1a2332;
+  margin: 0;
+  padding: 0.875rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  background: #f8f9fa;
+  border-bottom: 1px solid #d1d5db;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .incidents-table {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 600px;
 }
 
 .incidents-table table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 0.8125rem;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .incidents-table th {
-  background: #f9fafb;
-  padding: 0.875rem;
+  background: #f3f4f6;
+  padding: 0.625rem 0.75rem;
   text-align: left;
-  font-weight: 600;
-  color: #6b7280;
-  font-size: 0.85rem;
+  font-weight: 500;
+  color: #4a5568;
+  font-size: 0.6875rem;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-bottom: 1px solid #e5e7eb;
+  letter-spacing: 0.025em;
+  border-bottom: 2px solid #d1d5db;
+  border-right: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.incidents-table th:last-child {
+  border-right: none;
 }
 
 .incidents-table td {
-  padding: 1rem 0.875rem;
+  padding: 0.5rem 0.75rem;
   border-bottom: 1px solid #f3f4f6;
-  font-size: 0.9rem;
+  border-right: 1px solid #fafafa;
+  font-size: 0.75rem;
+  color: #374151;
+  vertical-align: middle;
 }
 
-.incidents-table tr {
-  transition: all 0.2s ease;
+.incidents-table td:last-child {
+  border-right: none;
 }
 
-.incidents-table tr:hover {
+.incidents-table tbody tr {
+  transition: background 0.1s ease;
+}
+
+.incidents-table tbody tr:hover {
   background: #f9fafb;
-  transform: scale(1.005);
 }
 
-/* Incident Number Column Styling */
+.incidents-table tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+.incidents-table tbody tr:nth-child(even):hover {
+  background: #f3f4f6;
+}
+
+/* Enterprise Incident Number Column */
 .incident-number-cell {
-  font-weight: 600;
-  color: #1976d2;
-  text-align: center;
+  font-weight: 500;
+  color: #2563eb;
+  text-align: left;
   min-width: 80px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 0.75rem;
 }
 
 .incident-number-cell:hover {
-  color: #1565c0;
-  transform: scale(1.05);
-  transition: all 0.2s ease;
+  text-decoration: underline;
 }
 
-/* Simplified Severity Badges */
+/* Enterprise Severity Badges - Professional Tags */
 .severity-badge {
   display: inline-block;
-  padding: 0.25rem 0.625rem;
-  border-radius: 6px;
-  font-size: 0.7rem;
-  font-weight: 600;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.625rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.025em;
   white-space: nowrap;
-  margin-bottom: 2px;
-  transition: all 0.2s ease;
+  margin-bottom: 1px;
+  transition: none;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 /* Outlined variant for initial severity */
@@ -360,47 +620,40 @@
   color: #dc2626;
 }
 
-/* Modern compact badges for tenant/owner/users */
+/* Enterprise Data Badges - Professional Tags */
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0.3rem 0.6rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1;
+  gap: 4px;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.625rem;
+  font-weight: 500;
+  line-height: 1.2;
   white-space: nowrap;
-  background: #f3f4f6;
-  color: #374151;
-  border: 1px solid #e5e7eb;
-}
-
-.badge::before {
-  content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.6;
+  background: #f9fafb;
+  color: #4a5568;
+  border: 1px solid #d1d5db;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .badge-tenant {
-  background: #eef2ff;
-  color: #3730a3;
-  border-color: #e0e7ff;
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
 }
 
 .badge-owner {
-  background: #ecfeff;
-  color: #155e75;
-  border-color: #cffafe;
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
 }
 
 .badge-users {
-  background: #fef3c7;
-  color: #92400e;
-  border-color: #fde68a;
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
 }
 
 /* Active/Closed variants to ensure consistency */
@@ -435,31 +688,35 @@
   line-height: 1.35;
 }
 
-/* View Button */
+/* Enterprise Action Buttons - Minimal Professional */
 .view-btn {
-  background: linear-gradient(135deg, #2563eb, #1e40af);
-  color: white;
-  border: none;
-  padding: 0.5rem 0.9rem;
-  border-radius: 9999px;
+  background: transparent;
+  color: #4a5568;
+  border: 1px solid #d1d5db;
+  padding: 0.25rem;
   cursor: pointer;
-  font-size: 0.82rem;
-  font-weight: 600;
-  transition: all 0.2s ease;
+  font-size: 0.625rem;
+  font-weight: 400;
+  transition: background 0.1s ease;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  box-shadow: 0 2px 8px rgba(37,99,235,0.25);
+  justify-content: center;
+  width: 28px;
+  height: 28px;
 }
 
 .view-btn:hover {
-  filter: brightness(1.03);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(37,99,235,0.35);
+  background: #f3f4f6;
+  border-color: #9ca3af;
 }
 
 .view-btn:active {
-  transform: translateY(0);
+  background: #e5e7eb;
+}
+
+.view-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 .view-btn:focus-visible {
@@ -513,32 +770,31 @@
   box-shadow: 0 8px 20px rgba(139,92,246,0.35);
 }
 
-/* Modal with Animations */
+/* Enterprise Modal - Professional Dialog */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0,0,0,0.4);
-  backdrop-filter: blur(4px);
+  background: rgba(0,0,0,0.6);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  animation: fadeInUp 0.3s ease-out;
 }
 
 .modal-content {
   background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  max-width: 600px;
-  width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-  animation: scaleIn 0.3s ease-out;
+  padding: 0;
+  border: 1px solid #9ca3af;
+  max-width: 900px;
+  width: 95%;
+  max-height: 85vh;
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-content.incident-modal {
@@ -559,42 +815,53 @@
 }
 
 .modal-content h2 {
-  color: #1f2937;
-  margin: 0 0 1.5rem 0;
-  font-size: 1.5rem;
-  font-weight: 600;
+  color: #1a2332;
+  margin: 0;
+  padding: 0.875rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  background: #f3f4f6;
+  border-bottom: 1px solid #d1d5db;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.incident-details {
+  padding: 1.25rem;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .incident-details p {
-  margin: 0.5rem 0;
-  line-height: 1.6;
+  margin: 0.375rem 0;
+  line-height: 1.5;
   color: #4b5563;
+  font-size: 0.8125rem;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .incident-details strong {
-  color: #1f2937;
-  font-weight: 600;
+  color: #1a2332;
+  font-weight: 500;
 }
 
-/* QuickLook modern card */
+/* Enterprise QuickLook Card - Professional Summary */
 .quicklook-card {
   position: relative;
   background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 1rem;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  border: 1px solid #d1d5db;
+  padding: 0.875rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
 .quicklook-card .accent-bar {
   position: absolute;
   top: 0;
   left: 0;
-  height: 4px;
+  height: 2px;
   width: 100%;
-  background: linear-gradient(90deg, #3b82f6, #10b981);
-  border-top-left-radius: 12px;
-  border-top-right-radius: 12px;
+  background: #2563eb;
 }
 
 .quicklook-header {
@@ -669,24 +936,26 @@
 }
 
 .close-btn {
-  background: #6b7280;
-  color: white;
-  border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 6px;
+  background: transparent;
+  color: #4a5568;
+  border: 1px solid #d1d5db;
+  padding: 0.5rem 1rem;
   cursor: pointer;
-  margin-top: 1.5rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  margin: 1rem 1.25rem;
+  font-weight: 400;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  transition: background 0.1s ease;
+  align-self: flex-end;
 }
 
 .close-btn:hover {
-  background: #4b5563;
-  transform: scale(1.02);
+  background: #f3f4f6;
 }
 
 .close-btn:active {
-  transform: scale(0.98);
+  background: #e5e7eb;
 }
 
 /* Loading State */
@@ -705,92 +974,214 @@
   color: #6b7280;
 }
 
-/* AI Enhancement Section (New) */
+/* Enterprise AI Analytics Section - Executive Dashboard */
 .ai-insights-section {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.25rem;
-  margin-bottom: 2rem;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* System Health Widget */
+.system-health-widget {
+  background: white;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.system-health-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.system-health-title {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #4a5568;
+}
+
+.health-status {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.625rem;
+  padding: 0.125rem 0.375rem;
+  background: #f0fdf4;
+  color: #059669;
+  border: 1px solid #10b981;
+}
+
+.health-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.health-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.health-metric-label {
+  font-size: 0.625rem;
+  color: #9ca3af;
+  text-transform: uppercase;
+}
+
+.health-metric-value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1a2332;
 }
 
 .ai-insight-card {
   background: white;
-  padding: 1.5rem;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  border: 1px solid rgba(0,0,0,0.05);
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-left: 2px solid #2563eb;
   position: relative;
   overflow: hidden;
-  animation: fadeInUp 0.6s ease-out;
-  animation-fill-mode: both;
-  transition: all 0.3s ease;
-}
-
-.ai-insight-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #2563eb, #1d4ed8);
-  animation: slideInRight 0.8s ease-out;
+  transition: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 
 .ai-insight-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  background: #fafbfc;
+}
+
+/* Priority Alerts Widget */
+.priority-alerts-widget {
+  background: white;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.alerts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.alerts-title {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #4a5568;
+}
+
+.alert-count {
+  background: #fee2e2;
+  color: #dc2626;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  border: 1px solid #fca5a5;
+}
+
+.alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.alert-item {
+  padding: 0.375rem;
+  background: #fef2f2;
+  border-left: 2px solid #dc2626;
+  font-size: 0.6875rem;
+  color: #374151;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.alert-time {
+  font-size: 0.625rem;
+  color: #9ca3af;
 }
 
 .ai-insight-header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .ai-icon {
-  width: 24px;
-  height: 24px;
-  color: #2563eb;
+  width: 18px;
+  height: 18px;
+  color: #4a5568;
 }
 
 .ai-insight-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #1f2937;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1a2332;
   margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .ai-insight-content {
   color: #4b5563;
-  font-size: 0.9rem;
-  line-height: 1.6;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-/* AI Chat Button (Floating) */
+.ai-suggestion-chip {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  color: #4a5568;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.6875rem;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.ai-suggestion-chip:hover {
+  background: #f3f4f6;
+}
+
+/* Enterprise AI Chat Button */
 .ai-chat-button {
   position: fixed;
-  bottom: 2rem;
-  right: 2rem;
-  width: 56px;
-  height: 56px;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  border-radius: 50%;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  width: 48px;
+  height: 48px;
+  background: #2d3748;
+  border: 1px solid #4a5568;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(37,99,235,0.3);
-  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: background 0.15s ease;
   z-index: 100;
-  animation: scaleIn 0.5s ease-out 1s;
-  animation-fill-mode: both;
 }
 
 .ai-chat-button:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(37,99,235,0.4);
+  background: #1a2332;
 }
 
 .ai-chat-button svg {

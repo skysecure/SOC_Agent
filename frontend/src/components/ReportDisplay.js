@@ -79,9 +79,9 @@ function JsonRenderer({ data, depth = 0 }) {
   return <span className="json-unknown">{String(data)}</span>;
 }
 
-function ReportDisplay({ report }) {
+function ReportDisplay({ report, incidnetsDetails }) {
   const [openState, setOpenState] = useState({});
-  const [criticalOnly, setCriticalOnly] = useState(true);
+  const [criticalOnly, setCriticalOnly] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeKey, setActiveKey] = useState('');
   const [showToTop, setShowToTop] = useState(false);
@@ -150,8 +150,8 @@ function ReportDisplay({ report }) {
     key === 'recommendedActions' ||
     key === 'actionsTaken'
   );
-
-  const defaultOpenFor = (key) => isImportantSection(key) && !isLongSection(key);
+console.log(report,"reportreport");
+  const defaultOpenFor = (key) => false; // All sections collapsed by default
 
   const getOpen = (key) => {
     if (openState[key] === undefined) return defaultOpenFor(key);
@@ -271,11 +271,9 @@ function ReportDisplay({ report }) {
                   </div>}
           <div className="overview-spacer" />
           <div className="overview-actions">
-            <button className="toolbar-btn" onClick={() => setAllOpen(true)}>Expand all</button>
-            <button className="toolbar-btn" onClick={() => setAllOpen(false)}>Collapse all</button>
-            <label className="compact-toggle" title="Show only critical sections">
+            <label className="compact-toggle" title="Toggle view mode">
               <input type="checkbox" checked={criticalOnly} onChange={(e) => setCriticalOnly(e.target.checked)} />
-              <span>{criticalOnly ? '🔍 Critical' : '📋 All Sections'}</span>
+              <span>{criticalOnly ? '🔍 Critical Only' : '📋 All Sections'}</span>
             </label>
           </div>
         </div>

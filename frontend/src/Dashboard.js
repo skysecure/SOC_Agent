@@ -205,17 +205,17 @@ function Dashboard() {
       : 0
   };
 
-  // Prepare data for charts - showing both initial and AI-assessed severities
+  // Prepare data for charts - Enterprise color scheme
   const severityData = [
-    { name: 'High', initial: metrics.initialHigh, ai: metrics.aiHigh, color: '#d32f2f' },
-    { name: 'Medium', initial: metrics.initialMedium, ai: metrics.aiMedium, color: '#f57c00' },
-    { name: 'Low', initial: metrics.initialLow, ai: metrics.aiLow, color: '#fbc02d' },
-    { name: 'Informational', initial: metrics.initialInformational, ai: metrics.aiInformational, color: '#388e3c' }
+    { name: 'High', initial: metrics.initialHigh, ai: metrics.aiHigh, color: '#dc2626' },
+    { name: 'Medium', initial: metrics.initialMedium, ai: metrics.aiMedium, color: '#d97706' },
+    { name: 'Low', initial: metrics.initialLow, ai: metrics.aiLow, color: '#65a30d' },
+    { name: 'Informational', initial: metrics.initialInformational, ai: metrics.aiInformational, color: '#0891b2' }
   ];
 
   const statusData = [
-    { name: 'Closed', value: metrics.closed, color: '#4caf50' },
-    { name: 'Active', value: metrics.active, color: '#ff9800' }
+    { name: 'Closed', value: metrics.closed, color: '#059669' },
+    { name: 'Active', value: metrics.active, color: '#ea580c' }
   ];
 
   // Group incidents by date for trend chart
@@ -385,11 +385,25 @@ function Dashboard() {
             <h3>Incident Trend</h3>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={trendChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
+                <CartesianGrid strokeDasharray="0" stroke="#e5e7eb" />
+                <XAxis 
+                  dataKey="date" 
+                  tick={{ fontSize: 11, fill: '#6b7280' }}
+                  axisLine={{ stroke: '#d1d5db' }}
+                />
+                <YAxis 
+                  tick={{ fontSize: 11, fill: '#6b7280' }}
+                  axisLine={{ stroke: '#d1d5db' }}
+                />
                 <Tooltip />
-                <Line type="monotone" dataKey="incidents" stroke="#3f51b5" strokeWidth={2} />
+                <Line 
+                  type="monotone" 
+                  dataKey="incidents" 
+                  stroke="#2563eb" 
+                  strokeWidth={1.5}
+                  dot={{ fill: '#2563eb', r: 3 }}
+                  activeDot={{ r: 4 }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -398,20 +412,28 @@ function Dashboard() {
             <h3>Severity Distribution</h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={severityData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
+                <CartesianGrid strokeDasharray="0" stroke="#e5e7eb" />
+                <XAxis 
+                  dataKey="name" 
+                  tick={{ fontSize: 11, fill: '#6b7280' }}
+                  axisLine={{ stroke: '#d1d5db' }}
+                />
+                <YAxis 
+                  tick={{ fontSize: 11, fill: '#6b7280' }}
+                  axisLine={{ stroke: '#d1d5db' }}
+                />
                 <Tooltip 
                   formatter={(value, name) => [
                     value,
-                    name === 'initial' ? 'Initial Severity' : 'AI-Assessed Severity'
+                    name === 'initial' ? 'Initial' : 'AI-Assessed'
                   ]}
                 />
                 <Legend 
-                  formatter={(value) => value === 'initial' ? 'Initial Severity' : 'AI-Assessed Severity'}
+                  formatter={(value) => value === 'initial' ? 'Initial' : 'AI-Assessed'}
+                  wrapperStyle={{ fontSize: '11px' }}
                 />
-                <Bar dataKey="initial" fill="#9e9e9e" name="initial" />
-                <Bar dataKey="ai" fill="#3f51b5" name="ai" />
+                <Bar dataKey="initial" fill="#9ca3af" name="initial" />
+                <Bar dataKey="ai" fill="#2563eb" name="ai" />
               </BarChart>
             </ResponsiveContainer>
             <div className="severity-legend">
@@ -425,9 +447,16 @@ function Dashboard() {
             <h3>Status Overview</h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={statusData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
+                <CartesianGrid strokeDasharray="0" stroke="#e5e7eb" />
+                <XAxis 
+                  dataKey="name" 
+                  tick={{ fontSize: 11, fill: '#6b7280' }}
+                  axisLine={{ stroke: '#d1d5db' }}
+                />
+                <YAxis 
+                  tick={{ fontSize: 11, fill: '#6b7280' }}
+                  axisLine={{ stroke: '#d1d5db' }}
+                />
                 <Tooltip />
                 <Bar dataKey="value">
                   {statusData.map((entry, index) => (
@@ -600,7 +629,7 @@ function Dashboard() {
                       <strong>Tenant:</strong> {selectedIncidentDetails.tenant.displayName} • <strong>Subscription:</strong> {selectedIncidentDetails.tenant.subscriptionId} • <strong>Workspace:</strong> {selectedIncidentDetails.tenant.resourceGroup}/{selectedIncidentDetails.tenant.workspaceName} • <strong>Owner:</strong> {selectedIncidentDetails.tenant.ownerName}
                     </div>
                   )}
-                  <ReportDisplay report={selectedIncidentDetails.report} />
+                  <ReportDisplay incidnetsDetails={incidents} report={selectedIncidentDetails.report} />
                 </div>
               ) : quickLookIncident ? (
                 <div className="quicklook-card">

@@ -383,7 +383,7 @@ app.post('/analyse', async (req, res) => {
         contactEmail: process.env.SENDGRID_FROM_EMAIL || ''
       };
       const ackHtml = await generateAcknowledgementEmailHtml(ackContext);
-      emitStage({ stage: 'ACK_PREPARED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Acknowledgement prepared', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+      // emitStage({ stage: 'ACK_PREPARED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Acknowledgement prepared', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
       
       console.log(`📧 [EMAIL][ACK] Preparing acknowledgement email for request ${requestId}`, {
         recipients: ackTo,
@@ -437,7 +437,7 @@ app.post('/analyse', async (req, res) => {
     }
 
     console.log('[ANALYSE] Starting RCA generation');
-    emitStage({ stage: 'RCA_SEVERITY_STARTED', status: 'in_progress', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA & severity assessment started', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+    // emitStage({ stage: 'RCA_SEVERITY_STARTED', status: 'in_progress', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA & severity assessment started', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
     const report = await analyzeIncident(incidentData);
     console.log('[ANALYSE] RCA generated');
     
@@ -508,7 +508,7 @@ app.post('/analyse', async (req, res) => {
         console.log('[SENTINEL] Attempting auto-assignment/update', { incidentArmId, aiSeverity });
         
         const sentinelStartTime = Date.now();
-        emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'in_progress', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Updating Sentinel incident', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+        // emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'in_progress', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Updating Sentinel incident', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
         
         // Pass AI-assessed severity to Sentinel update (owner/status taken from env)
         assignmentResult = await updateSentinelIncident(
@@ -535,11 +535,11 @@ app.post('/analyse', async (req, res) => {
         }
       } else {
         console.log('[SENTINEL] Skipping update (no incident ARM id found)');
-        emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - no ARM id', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+        // emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - no ARM id', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
       }
     } else {
       console.log('[SENTINEL] Skipping update (config not set)');
-      emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - config missing', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+      // emitStage({ stage: 'SENTINEL_UPDATE_STARTED', status: 'skipped', requestId, incidentId: incidentIdentifiers.incidentId, message: 'Sentinel update skipped - config missing', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
     }
 
     // Final RCA email to tenant recipients (customerMail.toSenderMail)
@@ -580,7 +580,7 @@ app.post('/analyse', async (req, res) => {
         });
         
         const html = await generateOutlookHtmlFromRCA(correctedReport);
-        emitStage({ stage: 'RCA_EMAIL_PREPARED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA email prepared', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
+        // emitStage({ stage: 'RCA_EMAIL_PREPARED', status: 'done', requestId, incidentId: incidentIdentifiers.incidentId, message: 'RCA email prepared', meta: { incidentNumber: incidentNumber, tenantKey: tenantCtx.key, subscriptionId: tenantCtx.subscriptionId } });
         
         console.log(`📧 [EMAIL][RCA] Sending RCA email for request ${requestId}`, { 
           to, 
