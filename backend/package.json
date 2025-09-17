@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "db:init": "node scripts/initDb.js",
+    "db:migrate-tenants": "node scripts/migrateTenants.js"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.0",
@@ -14,6 +16,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "mongodb": "^6.19.0",
+    "mongoose": "^8.18.1",
     "openai": "^5.16.0"
   }
 }

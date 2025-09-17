@@ -9,6 +9,9 @@ import { mailSender } from './services/mailService.js';
 import { callAI } from './services/aiService.js';
 import { sseHandler, emitStage } from './services/eventStream.js';
 import { listTenants, getTenantBySubscriptionId, getTenantByKey, extractSubscriptionIdFromArmId } from './services/tenantService.js';
+import database from './services/db.js';
+import incidentRepository from './repositories/incidentRepository.js';
+import tenantRepository from './repositories/tenantRepository.js';
 
 dotenv.config();
 
@@ -56,8 +59,11 @@ app.get('/health', (req, res) => {
   }
 });
 
-// Simple in-memory storage for incidents (in production, use a database)
-const incidents = [];
+// Database connection flag
+let dbConnected = false;
+
+// Note: Incidents are now stored only in MongoDB
+// SSE events are handled separately through the eventStream service
 
 // Helper function to extract incident type from report
 function extractIncidentType(report) {
@@ -287,24 +293,34 @@ app.post('/analyse', async (req, res) => {
     // Allow duplicate block ONLY if it's the same Logic App run, or if the
     // same incident/content arrived very recently (time-window based).
     const DUPLICATE_WINDOW_MS = 60 * 1000; // 60 seconds window for safety
-    const existingIncident = incidents.find(inc => {
-      const idMatch = inc.originalData?.id === incidentIdentifiers.incidentId ||
-                      inc.originalData?.properties?.id === incidentIdentifiers.incidentId ||
-                      inc.originalData?.name === incidentIdentifiers.incidentId;
+    
+    // Check for duplicates in database
+    let existingIncident = null;
+    if (dbConnected) {
+      const duplicates = await incidentRepository.findDuplicates(
+        incidentIdentifiers.incidentId,
+        incidentIdentifiers.armId
+      );
+      
+      existingIncident = duplicates.find(inc => {
+        const idMatch = inc.originalData?.id === incidentIdentifiers.incidentId ||
+                        inc.originalData?.properties?.id === incidentIdentifiers.incidentId ||
+                        inc.originalData?.name === incidentIdentifiers.incidentId;
 
-      const logicAppMatch = inc.emailTracking?.logicApp?.workflowRunId === incidentIdentifiers.logicApp.workflowRunId &&
-                            inc.emailTracking?.logicApp?.workflowRunId !== 'unknown';
+        const logicAppMatch = inc.emailTracking?.logicApp?.workflowRunId === incidentIdentifiers.logicApp.workflowRunId &&
+                              inc.emailTracking?.logicApp?.workflowRunId !== 'unknown';
 
-      const hashMatch = inc.emailTracking?.dataHash === incidentIdentifiers.dataHash &&
-                        inc.emailTracking?.dataHash !== 'unknown';
+        const hashMatch = inc.emailTracking?.dataHash === incidentIdentifiers.dataHash &&
+                          inc.emailTracking?.dataHash !== 'unknown';
 
-      const isRecent = inc.timestamp && (Date.now() - inc.timestamp.getTime() < DUPLICATE_WINDOW_MS);
+        const isRecent = inc.timestamp && (Date.now() - new Date(inc.timestamp).getTime() < DUPLICATE_WINDOW_MS);
 
-      // Block if exact same Logic App run (definitive duplicate)
-      if (logicAppMatch) return true;
-      // Otherwise only treat as duplicate if it's the same incident/content AND very recent
-      return (idMatch || hashMatch) && isRecent;
-    });
+        // Block if exact same Logic App run (definitive duplicate)
+        if (logicAppMatch) return true;
+        // Otherwise only treat as duplicate if it's the same incident/content AND very recent
+        return (idMatch || hashMatch) && isRecent;
+      });
+    }
     
     if (existingIncident) {
       console.log(`🚨 [ANALYSE] DUPLICATE REQUEST BLOCKED!`, {
@@ -342,7 +358,7 @@ app.post('/analyse', async (req, res) => {
     });
     emitStage({ 
       stage: 'PIPELINE_STARTED', 
-      status: 'in_progress', 
+      status: 'done', 
       requestId,
       incidentId: incidentIdentifiers.incidentId,
       message: 'Pipeline initiated',
@@ -496,8 +512,20 @@ app.post('/analyse', async (req, res) => {
       }
     };
     
-    incidents.unshift(incidentRecord); // Add to beginning of array
-    console.log('[ANALYSE] Incident stored in memory', { id: incidentRecord.id });
+    // Save to database only
+    if (!dbConnected) {
+      throw new Error('Database not connected. Cannot save incident.');
+    }
+
+    try {
+      const savedIncident = await incidentRepository.create(incidentRecord);
+      console.log('[ANALYSE] Incident stored in database', { id: savedIncident.id });
+      // Update the incidentRecord with the saved ID for the response
+      incidentRecord.id = savedIncident.id;
+    } catch (dbError) {
+      console.error('[ANALYSE] Failed to save to database:', dbError);
+      throw new Error('Failed to save incident to database');
+    }
     
     // Auto-assign incident in Sentinel if configuration is available
     let assignmentResult = null;
@@ -676,12 +704,10 @@ app.post('/analyse', async (req, res) => {
       });
     }
     
-    // Check for potential duplicate incidents
-    const duplicateIncidents = incidents.filter(inc => 
-      inc.id !== incidentRecord.id && 
-      (inc.originalData?.id === incidentIdentifiers.incidentId ||
-       inc.originalData?.properties?.id === incidentIdentifiers.incidentId ||
-       inc.originalData?.name === incidentIdentifiers.incidentId)
+    // Check for potential duplicate incidents in database
+    const duplicateIncidents = await incidentRepository.findDuplicates(
+      incidentIdentifiers.incidentId,
+      incidentRecord.armId
     );
     
     if (duplicateIncidents.length > 0) {
@@ -721,11 +747,23 @@ app.post('/analyse', async (req, res) => {
 
 // Get all incidents
 app.get('/incidents', async (req, res) => {
-
   try {
+    if (!dbConnected) {
+      return res.status(503).json({ error: 'Database not connected' });
+    }
+    
+    const { tenant: tenantKey, status, severity, limit = 100, offset = 0 } = req.query;
+    const incidentsData = await incidentRepository.findAll({
+      tenantKey,
+      status,
+      severity,
+      limit: parseInt(limit),
+      skip: parseInt(offset)
+    });
+    
     // Return simplified incident data for dashboard including severity assessment
-    const simplifiedIncidents = incidents.map(inc => ({
-      id: inc.id,
+    const simplifiedIncidents = incidentsData.map(inc => ({
+      id: inc.id || inc._id?.toString(),
       internalId: inc.internalId,
       armId: inc.armId,
       timestamp: inc.timestamp,
@@ -748,11 +786,33 @@ app.get('/incidents', async (req, res) => {
 });
 
 // Tenants endpoint for UI dropdown
-app.get('/tenants', (req, res) => {
+app.get('/tenants', async (req, res) => {
   try {
-    const items = listTenants();
+    let items;
+    
+    // Use database if connected, otherwise fall back to JSON file
+    if (dbConnected) {
+      try {
+        const dbTenants = await tenantRepository.findAll(false); // Only active tenants
+        items = dbTenants.map(t => ({
+          key: t.key,
+          displayName: t.displayName,
+          subscriptionId: t.subscriptionId,
+          resourceGroup: t.resourceGroup,
+          workspaceName: t.workspaceName,
+          ownerName: t.ownerName
+        }));
+      } catch (dbError) {
+        console.error('[GET /tenants] Database error, falling back to JSON:', dbError);
+        items = listTenants();
+      }
+    } else {
+      items = listTenants();
+    }
+    
     res.json(items);
-  } catch (e) {
+  } catch (error) {
+    console.error('Error listing tenants:', error);
     res.status(500).json({ error: 'Failed to list tenants' });
   }
 });
@@ -760,7 +820,12 @@ app.get('/tenants', (req, res) => {
 // Get single incident details
 app.get('/incidents/:id', async (req, res) => {
   try {
-    const incident = incidents.find(inc => inc.id === req.params.id);
+    if (!dbConnected) {
+      return res.status(503).json({ error: 'Database not connected' });
+    }
+    
+    const incident = await incidentRepository.findById(req.params.id);
+    
     if (!incident) {
       return res.status(404).json({ error: 'Incident not found' });
     }
@@ -774,13 +839,20 @@ app.get('/incidents/:id', async (req, res) => {
 // Update incident status
 app.patch('/incidents/:id', async (req, res) => {
   try {
-    const incident = incidents.find(inc => inc.id === req.params.id);
-    if (!incident) {
-      return res.status(404).json({ error: 'Incident not found' });
+    if (!dbConnected) {
+      return res.status(503).json({ error: 'Database not connected' });
     }
     
-    if (req.body.status) {
-      incident.status = req.body.status;
+    const { status } = req.body;
+    
+    if (status) {
+      await incidentRepository.updateStatus(req.params.id, status);
+    }
+    
+    const incident = await incidentRepository.findById(req.params.id);
+    
+    if (!incident) {
+      return res.status(404).json({ error: 'Incident not found' });
     }
     
     res.json(incident);
@@ -793,7 +865,11 @@ app.patch('/incidents/:id', async (req, res) => {
 // AI-Powered Threat Intelligence endpoint
 app.get('/api/threat-intelligence/:incidentId', async (req, res) => {
   try {
-    const incident = incidents.find(inc => inc.id === req.params.incidentId);
+    if (!dbConnected) {
+      return res.status(503).json({ error: 'Database not connected' });
+    }
+    
+    const incident = await incidentRepository.findById(req.params.incidentId);
     if (!incident) {
       return res.status(404).json({ error: 'Incident not found' });
     }
@@ -1389,19 +1465,26 @@ app.post('/email/rca', async (req, res) => {
 // ===== EMAIL DEBUGGING ENDPOINTS =====
 
 // Get email statistics and debugging information
-app.get('/debug/emails', (req, res) => {
+app.get('/debug/emails', async (req, res) => {
   try {
+    if (!dbConnected) {
+      return res.status(503).json({ error: 'Database not connected' });
+    }
+    
+    // Get recent incidents from database for statistics
+    const recentIncidents = await incidentRepository.getRecentIncidents(100);
+    
     const emailStats = {
-      totalIncidents: incidents.length,
-      incidentsWithEmails: incidents.filter(inc => inc.emailTracking).length,
-      emailBreakdown: incidents.reduce((acc, inc) => {
+      totalIncidents: recentIncidents.length,
+      incidentsWithEmails: recentIncidents.filter(inc => inc.emailTracking).length,
+      emailBreakdown: recentIncidents.reduce((acc, inc) => {
         if (inc.emailTracking) {
           const emailCount = inc.emailTracking.totalEmailsSent || 0;
           acc[emailCount] = (acc[emailCount] || 0) + 1;
         }
         return acc;
       }, {}),
-      recentIncidents: incidents.slice(0, 10).map(inc => ({
+      recentIncidents: recentIncidents.slice(0, 10).map(inc => ({
         id: inc.id,
         timestamp: inc.timestamp,
         type: inc.type,
@@ -1424,9 +1507,13 @@ app.get('/debug/emails', (req, res) => {
 });
 
 // Get detailed email tracking for a specific incident
-app.get('/debug/emails/:incidentId', (req, res) => {
+app.get('/debug/emails/:incidentId', async (req, res) => {
   try {
-    const incident = incidents.find(inc => inc.id === req.params.incidentId);
+    if (!dbConnected) {
+      return res.status(503).json({ error: 'Database not connected' });
+    }
+    
+    const incident = await incidentRepository.findById(req.params.incidentId);
     if (!incident) {
       return res.status(404).json({ error: 'Incident not found' });
     }
@@ -1450,9 +1537,73 @@ app.get('/debug/emails/:incidentId', (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`📧 Email debugging endpoints available:`);
-  console.log(`   GET /debug/emails - Email statistics overview`);
-  console.log(`   GET /debug/emails/:incidentId - Detailed email tracking for specific incident`);
-});
+// Initialize database and start server
+async function startServer() {
+  try {
+    // Connect to MongoDB
+    await database.connect();
+    dbConnected = true;
+    console.log('[Server] Database connected successfully');
+    
+    // Migrate tenants if collection is empty
+    const tenantCount = await tenantRepository.count();
+    if (tenantCount === 0) {
+      console.log('[Server] No tenants in database, checking for tenants.json...');
+      
+      // Load full tenant data from JSON file for migration
+      const fs = await import('fs');
+      const path = await import('path');
+      const { fileURLToPath } = await import('url');
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = path.dirname(__filename);
+      const tenantsPath = path.resolve(__dirname, './config/tenants.json');
+      
+      if (fs.existsSync(tenantsPath)) {
+        const tenantsData = JSON.parse(fs.readFileSync(tenantsPath, 'utf8'));
+        if (Array.isArray(tenantsData) && tenantsData.length > 0) {
+          console.log(`[Server] Migrating ${tenantsData.length} tenants from JSON file...`);
+          for (const tenant of tenantsData) {
+            // Prepare complete tenant document with all fields
+            const tenantDoc = {
+              key: tenant.key,
+              displayName: tenant.displayName,
+              tenantId: tenant.tenantId,
+              clientId: tenant.clientId,
+              clientSecret: tenant.clientSecret,
+              subscriptionId: tenant.subscriptionId,
+              resourceGroup: tenant.resourceGroup,
+              workspaceName: tenant.workspaceName,
+              ownerName: tenant.ownerName,
+              ownerEmail: tenant.ownerEmail,
+              ownerObjectId: tenant.ownerObjectId,
+              ownerUPN: tenant.ownerUpn || tenant.ownerUPN,
+              customerMail: tenant.customerMail,
+              isActive: true,
+              emailNotifications: true,
+              autoAssignIncidents: true
+            };
+            await tenantRepository.upsert(tenantDoc);
+          }
+          console.log('[Server] Tenant migration completed');
+        }
+      }
+    }
+    
+    // Start the server
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+      console.log(`[Server] Database: ${dbConnected ? 'Connected' : 'Not connected'}`);
+      console.log(`[Server] Health check: http://localhost:${PORT}/health`);
+      console.log(`📧 Email debugging endpoints available:`);
+      console.log(`   GET /debug/emails - Email statistics overview`);
+      console.log(`   GET /debug/emails/:incidentId - Detailed email tracking for specific incident`);
+    });
+    
+  } catch (error) {
+    console.error('[Server] Failed to start:', error);
+    process.exit(1);
+  }
+}
+
+// Start the application
+startServer();

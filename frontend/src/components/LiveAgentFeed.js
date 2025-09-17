@@ -49,7 +49,7 @@ function Toast({ pipeline, onClose }) {
       <div className="card-header">
         <div className="header-content">
           <div className="incident-title">
-            {`Incident ${headerId}`} {ai ? `• AI: ${ai}` : ''} {owner ? `• Owner: ${owner}` : ''}
+            {`Incident Number: ${headerId}`} {ai ? ` •   AI Severity: ${ai?.toUpperCase()}` : ''} {owner ? `• Owner: ${owner}` : ''}
           </div>
           <div className="request-id">
             {`Req: ${requestId || ''}`}

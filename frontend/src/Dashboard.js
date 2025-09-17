@@ -156,7 +156,12 @@ function Dashboard() {
   const fetchTenants = async () => {
     try {
       const response = await axios.get(`http://${IP}:${PORT}/tenants`);
-      setTenants([{ key: 'ALL', displayName: 'All tenants' }, ...response.data]);
+      // Format tenants to include owner name in display
+      const formattedTenants = response.data.map(t => ({
+        ...t,
+        displayName: t.ownerName ? `${t.displayName} (Agent - ${t.ownerName})` : t.displayName
+      }));
+      setTenants([{ key: 'ALL', displayName: 'All tenants' }, ...formattedTenants]);
     } catch (_) {
       setTenants([{ key: 'ALL', displayName: 'All tenants' }]);
     }
