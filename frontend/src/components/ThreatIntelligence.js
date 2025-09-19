@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './ThreatIntelligence.css';
+import { API_BASE_URL } from '../config';
 
-const IP = process.env.IP || "localhost";
-const PORT = process.env.PORT || "3002";
+const API_URL = API_BASE_URL;
 function ThreatIntelligence({ incident }) {
   const [threatData, setThreatData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -18,7 +18,7 @@ function ThreatIntelligence({ incident }) {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch(`http://${IP}:${PORT}/api/threat-intelligence/${incident.id}`);
+        const response = await fetch(`${API_URL}/api/threat-intelligence/${incident.id}`);
         
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`);

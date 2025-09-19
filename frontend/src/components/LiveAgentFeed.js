@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { API_BASE_URL } from '../config';
 import './LiveAgentFeed.css';
 
-const IP = process.env.IP || "localhost";
-const PORT = process.env.PORT || "3002";
+const API_URL = API_BASE_URL;
 
 const STAGES = [
   'INCIDENT_RECEIVED',
@@ -100,7 +100,7 @@ export default function LiveAgentFeed({ selectedTenantKey = 'ALL', onPipelineCom
   const connectedAtRef = useRef(new Date());
 
   useEffect(() => {
-    const url = `http://${IP}:${PORT}/agent/stream?scope=global&history=50`;
+    const url = `${API_URL}/agent/stream?scope=global&history=50`;
     const es = new EventSource(url);
     eventSourceRef.current = es;
 

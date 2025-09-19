@@ -14,6 +14,7 @@ import incidentRepository from './repositories/incidentRepository.js';
 import tenantRepository from './repositories/tenantRepository.js';
 
 dotenv.config();
+import appConfig from './config/appConfig.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -50,6 +51,7 @@ app.get('/health', (req, res) => {
         email: hasSendGrid,
         sentinelConfigured
       },
+      publicBaseUrl: appConfig.PUBLIC_BASE_URL,
       latencyMs: Date.now() - startedAt
     };
 
@@ -1594,6 +1596,7 @@ async function startServer() {
       console.log(`Server running on port ${PORT}`);
       console.log(`[Server] Database: ${dbConnected ? 'Connected' : 'Not connected'}`);
       console.log(`[Server] Health check: http://localhost:${PORT}/health`);
+      console.log(`[Server] Public base URL (computed): ${appConfig.PUBLIC_BASE_URL}`);
       console.log(`📧 Email debugging endpoints available:`);
       console.log(`   GET /debug/emails - Email statistics overview`);
       console.log(`   GET /debug/emails/:incidentId - Detailed email tracking for specific incident`);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import { API_BASE_URL } from './config';
 import { format } from 'date-fns';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -13,8 +14,7 @@ import ThreatIntelligence from './components/ThreatIntelligence';
 import LiveAgentFeed from './components/LiveAgentFeed';
 import CustomDropdown from './components/CustomDropdown';
 
-const IP = process.env.IP || "localhost";
-const PORT = process.env.PORT || "3002";
+const API_URL = API_BASE_URL;
 
 // Recursive component to render any JSON structure
 function JsonRenderer({ data, depth = 0 }) {
@@ -132,7 +132,7 @@ function Dashboard() {
 
   const fetchIncidents = async () => {
     try {
-      const response = await axios.get(`http://${IP}:${PORT}/incidents`);
+      const response = await axios.get(`${API_URL}/incidents`);
       setIncidents(response.data);
     } catch (err) {
       setError('Failed to fetch incidents: ' + (err.message || 'Unknown error'));
@@ -155,7 +155,7 @@ function Dashboard() {
 
   const fetchTenants = async () => {
     try {
-      const response = await axios.get(`http://${IP}:${PORT}/tenants`);
+      const response = await axios.get(`${API_URL}/tenants`);
       // Format tenants to include owner name in display
       const formattedTenants = response.data.map(t => ({
         ...t,
@@ -553,7 +553,7 @@ function Dashboard() {
                             setSelectedIncident(incident);
                             setLoadingDetails(true);
                             try {
-                              const response = await axios.get(`http://${IP}:${PORT}/incidents/${incident.id}`);
+                              const response = await axios.get(`${API_URL}/incidents/${incident.id}`);
                               setSelectedIncidentDetails(response.data);
                             } catch (err) {
                               console.error('Failed to fetch incident details:', err);

@@ -28,6 +28,20 @@ AI-assisted SOC tool that ingests incident JSON, generates an RCA and severity, 
 - Core: `PORT=3002`, `GEMINI_API_KEY=...`, `AI_PROVIDER=gemini|openai`
 - Email: `SENDGRID_API_KEY=...`, `SENDGRID_FROM_EMAIL=...`, `TOSENDERMAIL=...`
 - Sentinel (optional): `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_WORKSPACE_NAME`, `SENTINEL_OWNER_EMAIL`, `SENTINEL_OWNER_UPN`, `SENTINEL_OWNER_OBJECT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_MANAGEMENT_API_URL`, `SENTINEL_API_VERSION`
+
+  - Runtime Base URL configuration:
+    - Backend `.env`:
+      - `ENV=DEVELOPMENT`
+      - `IP=192.168.0.66`
+      - `PORT=3002`
+      - `AZURE_APP_SERVICE=<domain>`
+      - Computed: `PUBLIC_BASE_URL = (ENV === 'DEVELOPMENT') ? \`${IP}:${PORT}\` : \`${AZURE_APP_SERVICE}\``
+    - Frontend `.env.local`:
+      - `REACT_APP_ENV=DEVELOPMENT`
+      - `REACT_APP_IP=192.168.0.66`
+      - `REACT_APP_PORT=3002`
+      - `REACT_APP_AZURE_APP_SERVICE=<domain>`
+      - Computed: `API_BASE_URL = (REACT_APP_ENV === 'DEVELOPMENT') ? http://${REACT_APP_IP}:${REACT_APP_PORT} : https://${REACT_APP_AZURE_APP_SERVICE}`
 - SSE (optional): `SSE_HEARTBEAT_MS`, `SSE_GLOBAL_HISTORY`, `SSE_PIPELINE_HISTORY`
 
 ## How it works (pipeline)

@@ -3,10 +3,8 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import './App.css';
 import ReportDisplay from './components/ReportDisplay';
-
-
-const IP = process.env.IP || "localhost";
-const PORT = process.env.PORT || "3002";
+import { API_BASE_URL } from './config';
+const API_URL = API_BASE_URL;
 // Recursive component to render any JSON structure
 function JsonRenderer({ data, depth = 0 }) {
   // Handle null or undefined
@@ -110,7 +108,7 @@ function App() {
     setReport(null);
     try {
       const parsedData = JSON.parse(incidentData);
-      const response = await axios.post(`http://${IP}:${PORT}/analyse`, parsedData);
+      const response = await axios.post(`${API_URL}/analyse`, parsedData);
       setReport(response.data);
     } catch (err) {
       if (err.message.includes('JSON')) {

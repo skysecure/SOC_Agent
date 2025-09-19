@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../config';
 import './AIChatPanel.css';
 
-const API_URL = `http://${process.env.REACT_APP_API_HOST || 'localhost'}:${process.env.REACT_APP_API_PORT || '3002'}`;
+const API_URL = API_BASE_URL;
 
 // HTML escape function for security
 const escapeHtml = (input) => {
