@@ -58,3 +58,6 @@ frontend/.eslintcache
 .temp/
 tmp/
 
+
+# Local env files
+backend/.env
