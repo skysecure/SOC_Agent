@@ -3,6 +3,8 @@ backend/node_modules/
 frontend/node_modules/
 node_modules/
 
+backend/config/tenants.json
+
 # Production build
 frontend/build/
 frontend/dist/
@@ -15,6 +17,15 @@ frontend/dist/
 .env.production.local
 backend/.env
 frontend/.env
+
+# Additional environment/secret patterns
+**/.env
+**/.env.*
+.env.*
+backend/.env.*
+frontend/.env.*
+.envrc
+.envrc.local
 
 # Logs
 *.log
